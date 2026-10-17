@@ -1,0 +1,88 @@
+{
+  "name": "serambi",
+  "productName": "Serambi",
+  "version": "1.0.0",
+  "description": "Kelola Instagram, Facebook, X, WhatsApp, dan Telegram dari satu aplikasi.",
+  "main": "src/main/main.js",
+  "author": "Serambi",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "icons": "node scripts/gen-icons.js && node scripts/gen-assets.js",
+    "dist:win": "electron-builder --win --x64",
+    "dist:mac": "electron-builder --mac --x64 --arm64",
+    "dist": "electron-builder --win --mac"
+  },
+  "build": {
+    "appId": "id.serambi.app",
+    "productName": "Serambi",
+    "copyright": "Serambi",
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "publish": null,
+    "win": {
+      "icon": "build/icon-win.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Serambi-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Serambi",
+      "installerLanguages": [
+        "id_ID",
+        "en_US"
+      ],
+      "language": "1057"
+    },
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.social-networking",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "Serambi-${version}-${arch}.${ext}",
+      "identity": "-",
+      "extendInfo": {
+        "NSCameraUsageDescription": "Serambi memakai kamera untuk panggilan video di WhatsApp, Telegram, dan platform lain.",
+        "NSMicrophoneUsageDescription": "Serambi memakai mikrofon untuk pesan suara dan panggilan."
+      },
+      "hardenedRuntime": false,
+      "notarize": false
+    },
+    "dmg": {
+      "title": "Serambi ${version}"
+    }
+  },
+  "devDependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+    "electron": "^38.8.6",
+    "electron-builder": "^26.15.3",
+    "lucide-static": "^1.59.0",
+    "sharp": "^0.35.5"
+  }
+}
