@@ -88,12 +88,12 @@ export function toast(message, { kind = 'ok', action, onAction, ms = 3600 } = {}
 }
 
 // ---------- modal ----------
-export function openModal({ title, body, foot, wide = false, onClose, headExtra = '' }) {
+export function openModal({ title, body, foot, wide = false, xl = false, onClose, headExtra = '', cls = '' }) {
   const root = $('#modal-root');
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   overlay.innerHTML = `
-    <div class="modal ${wide ? 'wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <div class="modal ${wide ? 'wide' : ''} ${xl ? 'xl' : ''} ${cls}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
       <div class="modal-head">${headExtra}<h2>${esc(title)}</h2><button class="icon-btn" data-close aria-label="Tutup">${icon('x')}</button></div>
       <div class="modal-body">${body}</div>
       ${foot ? `<div class="modal-foot">${foot}</div>` : ''}
@@ -130,12 +130,12 @@ export function confirmDialog({ title, message, confirm = 'Lanjutkan', danger = 
   });
 }
 
-export function promptDialog({ title, label, value = '', confirm = 'Simpan', placeholder = '' }) {
+export function promptDialog({ title, label, value = '', confirm = 'Simpan', placeholder = '', type = 'text', maxlength = 60, hint = '' }) {
   return new Promise((resolve) => {
     let done = false;
     const m = openModal({
       title,
-      body: `<div class="field"><label for="pd-input">${esc(label)}</label><input id="pd-input" class="input" value="${esc(value)}" placeholder="${esc(placeholder)}" maxlength="60"></div>`,
+      body: `<div class="field"><label for="pd-input">${esc(label)}</label><input id="pd-input" class="input" type="${esc(type)}" value="${esc(value)}" placeholder="${esc(placeholder)}" maxlength="${maxlength}">${hint ? `<span class="hint">${esc(hint)}</span>` : ''}</div>`,
       foot: `<button class="btn ghost" data-no>Batal</button><button class="btn primary" data-yes>${esc(confirm)}</button>`,
       onClose: () => { if (!done) resolve(null); }
     });
@@ -185,3 +185,97 @@ export function showMenu(anchor, items, { align = 'right' } = {}) {
 document.addEventListener('mousedown', (e) => { if (openMenuEl && !openMenuEl.contains(e.target)) closeMenu(); }, true);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
 window.addEventListener('blur', closeMenu);
+
+// ---------- v1.2 helpers ----------
+const fmtDateF = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
+const fmtDateLongF = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'long', year: 'numeric' });
+const fmtDateTimeF = new Intl.DateTimeFormat(LOCALE, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+export const fmtDate = (ts) => ts ? fmtDateF.format(new Date(ts)) : '—';
+export const fmtDateLong = (ts) => ts ? fmtDateLongF.format(new Date(ts)) : '—';
+export const fmtDateTime = (ts) => ts ? fmtDateTimeF.format(new Date(ts)) : '—';
+
+/** "5 menit lalu", "2 hari lalu", "dalam 3 jam" */
+export function timeAgo(ts, now = Date.now()) {
+  if (!ts) return '—';
+  const diff = ts - now;
+  const abs = Math.abs(diff);
+  const unit = abs < 60000 ? null : abs < 3600000 ? [Math.round(abs / 60000), 'menit'] : abs < 86400000 ? [Math.round(abs / 3600000), 'jam'] : abs < 30 * 86400000 ? [Math.round(abs / 86400000), 'hari'] : [Math.round(abs / (30 * 86400000)), 'bulan'];
+  if (!unit) return diff < 0 ? 'baru saja' : 'sebentar lagi';
+  return diff < 0 ? `${unit[0]} ${unit[1]} lalu` : `dalam ${unit[0]} ${unit[1]}`;
+}
+
+/** Remaining time until a deadline, e.g. "41 jam lagi" or "lewat 5 jam". */
+export function deadlineText(due, now = Date.now()) {
+  const h = Math.round((due - now) / 3600000);
+  if (h >= 48) return `${Math.round(h / 24)} hari lagi`;
+  if (h >= 1) return `${h} jam lagi`;
+  if (h > -1) return 'kurang dari 1 jam';
+  return `lewat ${Math.abs(h) >= 48 ? Math.round(Math.abs(h) / 24) + ' hari' : Math.abs(h) + ' jam'}`;
+}
+
+/** Segmented tab strip. tabs: [[id, label, iconName?, badge?]] */
+export function tabStrip(tabs, active, attr = 'data-tab') {
+  return `<div class="tabs" role="tablist">${tabs.map(([id, label, ic, badge]) =>
+    `<button role="tab" ${attr}="${id}" class="${id === active ? 'on' : ''}" aria-selected="${id === active}">${ic ? icon(ic, 16) : ''}<span>${esc(label)}</span>${badge ? `<span class="tab-badge">${esc(badge)}</span>` : ''}</button>`).join('')}</div>`;
+}
+
+/** Score ring 0–100 as inline SVG. */
+export function ring(score, size = 76, label = '') {
+  const r = (size - 10) / 2, c = 2 * Math.PI * r, v = Math.max(0, Math.min(100, Math.round(score)));
+  const tone = v >= 75 ? 'good' : v >= 45 ? 'mid' : 'low';
+  return `<span class="ring ${tone}" style="width:${size}px;height:${size}px"><svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true">
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="ring-bg"/>
+    ${v > 0 ? `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="ring-fg" stroke-dasharray="${(c * v / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 ${size / 2} ${size / 2})"/>` : ''}</svg>
+    <b>${v}</b>${label ? `<small>${esc(label)}</small>` : ''}</span>`;
+}
+
+/** Thin progress bar. */
+export function bar(value, max = 100, tone = '') {
+  const w = max ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
+  return `<span class="bar ${tone}"><span style="width:${w.toFixed(1)}%"></span></span>`;
+}
+
+export function csv(rows) {
+  const cell = (v) => {
+    const s = v == null ? '' : String(v);
+    return /[",;\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  return rows.map(r => r.map(cell).join(',')).join('\r\n');
+}
+
+/** Parses CSV or semicolon-separated text (Excel in Indonesian locale uses ";"). */
+export function parseCsv(text) {
+  const src = String(text || '').replace(/^﻿/, '');
+  const firstLine = src.split(/\r?\n/)[0] || '';
+  const sep = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+  const rows = []; let row = []; let cur = ''; let q = false;
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (q) {
+      if (ch === '"' && src[i + 1] === '"') { cur += '"'; i++; }
+      else if (ch === '"') q = false;
+      else cur += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === sep) { row.push(cur); cur = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && src[i + 1] === '\n') i++;
+      row.push(cur); rows.push(row); row = []; cur = '';
+    } else cur += ch;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter(r => r.some(c => String(c).trim()));
+}
+
+/** Reads values of [data-f] fields inside a container into an object. */
+export function readForm(root) {
+  const out = {};
+  root.querySelectorAll('[data-f]').forEach(el => {
+    const k = el.dataset.f;
+    if (el.type === 'checkbox') out[k] = el.checked;
+    else if (el.type === 'number') out[k] = el.value === '' ? '' : Number(el.value);
+    else out[k] = el.value;
+  });
+  return out;
+}
+
+export function charLen(s) { return Array.from(String(s || '')).length; }

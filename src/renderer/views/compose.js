@@ -6,7 +6,8 @@ import {
   esc, toast, showMenu, promptDialog, confirmDialog, fmtDayLong, fmtTime, relDay, toDateInput, toTimeInput,
   fromInputs, addDays, startOfDay, charCount, snippet
 } from '../util.js';
-import { S, api, go, emit, account, platformOf, tile, mediaTag, hasBot, modKey, KIND_LABEL, kindOf, orderedAccounts } from '../ctx.js';
+import { S, api, go, emit, account, platformOf, tile, mediaTag, hasBot, modKey, KIND_LABEL, kindOf, orderedAccounts, perm, inTeam, memberName, member } from '../ctx.js';
+import { utmUrl } from '../lib/ads.js';
 
 let root, tb, d, unsavedWarned;
 
@@ -20,8 +21,9 @@ function blankDraft() {
   const base = Date.now() + 60 * 60 * 1000;
   const rounded = Math.ceil(base / (15 * 60 * 1000)) * 15 * 60 * 1000;
   return {
-    id: null, text: '', media: [], targets: new Set(pre.length ? pre : ids), mode: 'now',
-    date: toDateInput(rounded), time: toTimeInput(rounded), preview: null, original: null
+    id: null, text: '', media: [], targets: new Set(pre.length ? pre : ids), mode: needsApproval() ? 'review' : 'now',
+    date: toDateInput(rounded), time: toTimeInput(rounded), preview: null, original: null,
+    assigneeId: inTeam() ? S.state.me.id : null, note: '', campaignId: null
   };
 }
 
@@ -34,12 +36,15 @@ function fromPost(p) {
     text: p.text,
     media: p.media.map(m => ({ ...m })),
     targets: new Set(p.targets.map(t => t.accountId)),
-    mode: p.status === 'scheduled' ? 'schedule' : p.status === 'draft' ? 'draft' : 'now',
+    mode: p.status === 'review' ? (needsApproval() ? 'review' : 'schedule') : p.status === 'scheduled' ? (needsApproval() ? 'review' : 'schedule') : p.status === 'draft' ? 'draft' : 'now',
     date: when ? toDateInput(when) : dflt.date,
     time: when ? toTimeInput(when) : dflt.time,
-    original: p
+    original: p, assigneeId: p.assigneeId || null, note: p.note || '', campaignId: p.campaignId || null
   };
 }
+
+/** Editors in a team with approval switched on send posts for review instead of scheduling them. */
+function needsApproval() { return inTeam() && !perm('post.schedule') && perm('post.write'); }
 
 function selectedAccounts() { return S.state.accounts.filter(a => d.targets.has(a.id)); }
 function selectedPlatforms() { return [...new Set(selectedAccounts().map(a => a.platform))]; }
@@ -176,30 +181,51 @@ function renderSide() {
   const toMonday = ((8 - dow) % 7) || 7;
   if (toMonday > 1) quick.push({ label: 'Senin 09.00', ts: at(toMonday, 9) });
 
-  const label = d.mode === 'now' ? 'Posting sekarang' : d.mode === 'schedule' ? 'Jadwalkan' : 'Simpan draf';
+  const label = d.mode === 'now' ? 'Posting sekarang' : d.mode === 'schedule' ? 'Jadwalkan' : d.mode === 'review' ? 'Ajukan persetujuan' : 'Simpan draf';
+  const approval = needsApproval();
+  const orig = d.original;
+  const team = inTeam();
+  const people = team ? S.state.members.filter(m => m.status === 'active' && m.role !== 'viewer') : [];
+  const comments = d.id ? S.state.comments.filter(c => c.postId === d.id).sort((a, b) => a.createdAt - b.createdAt) : [];
   const autoAccs = accs.filter(a => a.platform === 'telegram' && hasBot(a.id));
   const manualAccs = accs.filter(a => !autoAccs.includes(a));
 
   box.innerHTML = `
     <div class="side-card">
       <h3>Kapan diposting?</h3>
+      ${orig && orig.status === 'review' ? `<div class="approval-note">${icon('hourglass', 15)}<span>Menunggu persetujuan${orig.approval && orig.approval.requestedByName ? ` · diajukan ${esc(orig.approval.requestedByName)}` : ''}</span></div>` : ''}
+      ${orig && orig.approval && orig.approval.decision === 'rejected' && orig.status === 'draft' ? `<div class="approval-note rejected">${icon('circle-x', 15)}<span>Ditolak ${esc(orig.approval.decidedByName || '')}${orig.approval.decisionNote ? `: “${esc(orig.approval.decisionNote)}”` : ''}</span></div>` : ''}
       <div class="seg block" role="tablist">
-        <button class="${d.mode === 'now' ? 'on' : ''}" data-mode="now">Sekarang</button>
-        <button class="${d.mode === 'schedule' ? 'on' : ''}" data-mode="schedule">${icon('clock', 14)}Jadwalkan</button>
+        ${approval ? `<button class="${d.mode === 'review' ? 'on' : ''}" data-mode="review">${icon('send', 14)}Ajukan</button>` : `<button class="${d.mode === 'now' ? 'on' : ''}" data-mode="now">Sekarang</button>
+        <button class="${d.mode === 'schedule' ? 'on' : ''}" data-mode="schedule">${icon('clock', 14)}Jadwalkan</button>`}
         <button class="${d.mode === 'draft' ? 'on' : ''}" data-mode="draft">Draf</button>
       </div>
-      ${d.mode === 'schedule' ? `
+      ${d.mode === 'schedule' || d.mode === 'review' ? `
         <div class="when-row">
           <input type="date" class="input" data-date value="${esc(d.date)}" min="${toDateInput(now)}" aria-label="Tanggal">
           <input type="time" class="input" data-time value="${esc(d.time)}" aria-label="Jam">
         </div>
         <div class="quick-times">${quick.map(q => `<button data-quick="${q.ts}">${esc(q.label)}</button>`).join('')}</div>
         <div class="when-summary" data-when>${ts ? (ts <= now ? `<span class="error-text">Waktu ini sudah lewat. Pilih waktu lain.</span>` : `Diposting <b>${esc(fmtDayLong(ts))}</b> pukul <b>${esc(fmtTime(ts))}</b>`) : ''}</div>
+        ${d.mode === 'review' ? `<p class="hint" style="margin:0">Admin tim menyetujui dulu, lalu postingan otomatis masuk jadwal.</p>` : ''}
       ` : d.mode === 'draft' ? `<p class="hint" style="margin:0">Disimpan tanpa jadwal. Kamu bisa menjadwalkannya kapan saja dari halaman Jadwal.</p>` : ''}
-      <button class="btn primary lg block" data-submit>${d.mode === 'now' ? icon('send', 17) : d.mode === 'schedule' ? icon('calendar-days', 17) : icon('bookmark-plus', 17)}${label}</button>
+      ${team && people.length ? `<div class="field"><label for="c-assignee">Penanggung jawab</label>
+        <select id="c-assignee" class="input" data-assignee>
+          ${people.map(m => `<option value="${m.id}" ${d.assigneeId === m.id ? 'selected' : ''}>${esc(m.id === S.state.me.id ? m.name + ' (kamu)' : m.name)}</option>`).join('')}
+        </select><span class="hint">Pengingat waktunya posting muncul di komputer orang ini.</span></div>` : ''}
+      <button class="btn primary lg block" data-submit>${d.mode === 'now' ? icon('send', 17) : d.mode === 'schedule' ? icon('calendar-days', 17) : d.mode === 'review' ? icon('send', 17) : icon('bookmark-plus', 17)}${label}</button>
+      ${orig && orig.status === 'review' && perm('post.approve') ? `<div class="row-btns"><button class="btn sm block" data-decide="approve">${icon('check', 15)}Setujui</button><button class="btn sm danger block" data-decide="reject">${icon('x', 15)}Tolak</button></div>` : ''}
       ${d.id ? `<button class="btn ghost danger block" data-delete>${icon('trash-2', 16)}Hapus postingan</button>` : ''}
     </div>
-    ${accs.length && d.mode !== 'draft' ? `
+    ${d.note ? `<div class="side-card note-card">${icon('lightbulb', 16)}<span>${esc(d.note)}</span></div>` : ''}
+    ${team && d.id ? `
+    <div class="side-card">
+      <h3>Komentar tim</h3>
+      <div class="comments">${comments.length ? comments.map(c => `<div class="comment"><b>${esc(c.memberName || memberName(c.memberId) || 'Anggota')}</b><span class="faint"> · ${esc(fmtTime(c.createdAt))}, ${esc(relDay(c.createdAt))}</span>
+        ${c.memberId === S.state.me.id ? `<button class="icon-btn sm" data-uncomment="${c.id}" title="Hapus komentar">${icon('x', 13)}</button>` : ''}<p>${esc(c.text)}</p></div>`).join('') : '<p class="hint" style="margin:0">Belum ada komentar.</p>'}</div>
+      <div class="comment-box"><input class="input" data-comment placeholder="Tulis komentar…" maxlength="2000"><button class="btn sm" data-send-comment>${icon('send', 14)}</button></div>
+    </div>` : ''}
+    ${accs.length && d.mode !== 'draft' && d.mode !== 'review' ? `
     <div class="side-card">
       <h3>Cara terkirimnya</h3>
       <div class="how-list">
@@ -252,7 +278,7 @@ async function submit() {
   if (!accs.length) { toast('Pilih minimal satu akun tujuan', { kind: 'err' }); return; }
   if (!d.text.trim() && !d.media.length) { toast('Tulis sesuatu atau tambahkan foto atau video', { kind: 'err' }); root.querySelector('textarea').focus(); return; }
   let scheduledAt = null;
-  if (d.mode === 'schedule') {
+  if (d.mode === 'schedule' || d.mode === 'review') {
     scheduledAt = scheduledTs();
     if (!scheduledAt || scheduledAt <= Date.now() + 20000) { toast('Pilih waktu yang belum lewat', { kind: 'err' }); return; }
   }
@@ -264,7 +290,8 @@ async function submit() {
 
   const payload = {
     id: d.id, text: d.text, media: d.media, targetIds: [...d.targets],
-    status: d.mode === 'schedule' ? 'scheduled' : 'draft', scheduledAt
+    status: d.mode === 'schedule' ? 'scheduled' : d.mode === 'review' ? 'review' : 'draft', scheduledAt,
+    assigneeId: d.assigneeId || undefined, campaignId: d.campaignId || undefined
   };
   const btn = root.querySelector('[data-submit]');
   btn.disabled = true;
@@ -272,7 +299,11 @@ async function submit() {
   S.composeWip = null;
   d.saved = true;
 
-  if (d.mode === 'schedule') {
+  if (saved.status === 'review') {
+    toast('Diajukan untuk disetujui admin tim');
+    S.scheduleDay = scheduledAt; S.scheduleMonth = scheduledAt; S.scheduleMode = 'month';
+    go({ name: 'schedule' });
+  } else if (d.mode === 'schedule') {
     toast(`Dijadwalkan ${relDay(scheduledAt).toLowerCase() === 'hari ini' ? 'hari ini' : fmtDayLong(scheduledAt)} pukul ${fmtTime(scheduledAt)}`);
     S.scheduleDay = scheduledAt; S.scheduleMonth = scheduledAt; S.scheduleMode = 'month';
     go({ name: 'schedule' });
@@ -322,6 +353,11 @@ function appendText(line) {
 /** Insert the buyer-facing link of a Tokopedia or Shopee shop. */
 function shopLinkMenu(anchor) {
   const shops = orderedAccounts().filter(a => kindOf(a) === 'shop');
+  const camps = S.state.campaigns.filter(c => c.url && c.status !== 'done');
+  if (!shops.length && camps.length) {
+    showMenu(anchor, [{ heading: 'Sisipkan link kampanye' }, ...camps.map(c => ({ label: c.name, icon: 'link-2', onClick: () => { d.campaignId = c.id; appendText(utmUrl(c.url, c.utm || { source: 'serambi', medium: 'social', campaign: c.name })); } }))], { align: 'left' });
+    return;
+  }
   if (!shops.length) {
     showMenu(anchor, [
       { heading: 'Belum ada toko online' },
@@ -334,6 +370,10 @@ function shopLinkMenu(anchor) {
     const p = platformOf(a);
     if (a.shopUrl) items.push({ label: `${a.name} (${p.name})`, icon: 'link', onClick: () => appendText(`Belanja di ${p.name}: ${a.shopUrl}`) });
     else items.push({ label: `Atur link ${a.name} dulu`, icon: 'pencil', onClick: () => emit('edit-shop', a.id) });
+  }
+  if (camps.length) {
+    items.push('sep', { heading: 'Link kampanye (dengan UTM)' });
+    for (const c of camps) items.push({ label: c.name, icon: 'link-2', onClick: () => { d.campaignId = c.id; appendText(utmUrl(c.url, c.utm || { source: 'serambi', medium: 'social', campaign: c.name })); } });
   }
   showMenu(anchor, items, { align: 'left' });
 }
@@ -355,6 +395,12 @@ function templateMenu(anchor) {
     }
   });
   if (tpls.length) items.push({ label: 'Kelola templat', icon: 'settings', onClick: () => go({ name: 'settings', section: 'templates' }) });
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const soon = S.moments.filter(m => { const t = new Date(m.date + 'T00:00:00').getTime(); return t >= today.getTime() && t <= today.getTime() + 21 * 86400000 && m.kind !== 'gajian'; }).slice(0, 5);
+  if (soon.length) {
+    items.push('sep', { heading: 'Ide dari kalender momen' });
+    soon.forEach(m => items.push({ label: `${m.name} · ${fmtDayLong(new Date(m.date + 'T09:00:00').getTime())}`, icon: 'calendar-clock', onClick: () => { d.note = m.idea; appendText(m.name); renderSide(); } }));
+  }
   showMenu(anchor, items, { align: 'left' });
 }
 
@@ -394,7 +440,29 @@ function onClick(e) {
     emit('add-account');
   } else if ('goSettings' in b.dataset) {
     go({ name: 'settings', section: 'telegram' });
+  } else if (b.dataset.decide) {
+    decide(b.dataset.decide === 'approve');
+  } else if ('sendComment' in b.dataset) {
+    sendComment();
+  } else if (b.dataset.uncomment) {
+    api.removeComment(b.dataset.uncomment);
   }
+}
+
+async function decide(approve) {
+  const note = approve ? '' : await promptDialog({ title: 'Tolak postingan', label: 'Alasan (dikirim ke penulis)', placeholder: 'Misalnya: ganti foto, harga salah', maxlength: 300, confirm: 'Tolak' });
+  if (!approve && note === null) return;
+  await api.decidePost({ id: d.id, approve, note });
+  d.saved = true;
+  toast(approve ? 'Disetujui dan masuk jadwal' : 'Postingan dikembalikan ke penulis');
+  go({ name: 'schedule' });
+}
+async function sendComment() {
+  const input = root.querySelector('[data-comment]');
+  const text = input && input.value.trim();
+  if (!text) return;
+  await api.addComment({ postId: d.id, text });
+  input.value = '';
 }
 
 function onInput(e) {
@@ -402,6 +470,7 @@ function onInput(e) {
   if (t.matches('textarea')) { d.text = t.value; autosize(t); onTextChanged(); }
   else if (t.matches('[data-date]')) { d.date = t.value; refreshWhen(); }
   else if (t.matches('[data-time]')) { d.time = t.value; refreshWhen(); }
+  else if (t.matches('[data-assignee]')) { d.assigneeId = t.value; saveWip(); }
 }
 function refreshWhen() {
   const ts = scheduledTs();
@@ -440,6 +509,8 @@ async function onDrop(e) {
   addMedia(await api.importMedia(paths));
 }
 
+function onCommentKey(e) { if (e.key === 'Enter' && e.target.matches('[data-comment]')) { e.preventDefault(); sendComment(); } }
+
 export default {
   mount(el, titlebar, route) {
     root = el; tb = titlebar;
@@ -448,10 +519,23 @@ export default {
     else if (S.composeWip && !route.targets && !route.date) d = { ...S.composeWip, targets: new Set(S.composeWip.targets) };
     else d = blankDraft();
     if (route.targets) d.targets = new Set(route.targets);
+    if (route.text !== undefined && !existing) { d.text = String(route.text); d.note = route.note || ''; d.campaignId = route.campaignId || null; }
+    if (route.scheduledAt && !existing) {
+      const ts = route.scheduledAt > Date.now() ? route.scheduledAt : Math.ceil((Date.now() + 3600000) / 900000) * 900000;
+      d.mode = needsApproval() ? 'review' : 'schedule'; d.date = toDateInput(ts); d.time = toTimeInput(ts);
+    }
     if (route.date) {
       const x = new Date(route.date); x.setHours(9, 0, 0, 0);
       const ts = x.getTime() > Date.now() ? x.getTime() : Math.ceil((Date.now() + 3600000) / 900000) * 900000;
-      d.mode = 'schedule'; d.date = toDateInput(ts); d.time = toTimeInput(ts);
+      d.mode = needsApproval() ? 'review' : 'schedule'; d.date = toDateInput(ts); d.time = toTimeInput(ts);
+    }
+    if (!perm('post.write')) {
+      tb.innerHTML = '<h1>Tulis postingan</h1>';
+      root.innerHTML = `<div class="page narrow"><div class="empty" style="margin-top:24px">${icon('eye', 22)}<p>${S.state.readOnly ? 'Paket tim tidak aktif, jadi data tim hanya bisa dilihat.' : 'Peranmu di tim adalah Pengamat, jadi kamu bisa melihat jadwal tetapi tidak menulis postingan.'}</p>
+        <button class="btn" data-go-sched>${icon('calendar-days', 16)}Lihat jadwal</button></div></div>`;
+      root.querySelector('[data-go-sched]').onclick = () => go({ name: 'schedule' });
+      d = blankDraft(); d.saved = true; d.readOnly = true;
+      return;
     }
 
     tb.innerHTML = `<h1>${d.id ? 'Edit postingan' : 'Tulis postingan'}</h1><span class="grow"></span>
@@ -489,24 +573,31 @@ export default {
     root.addEventListener('dragover', onDragOver);
     root.addEventListener('dragleave', onDragLeave);
     root.addEventListener('drop', onDrop);
+    root.addEventListener('keydown', onCommentKey);
     refreshAll();
     const ta = root.querySelector('textarea');
     autosize(ta);
     setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
   },
   update() {
+    if (d.readOnly) return;
     // Accounts may have been added or removed elsewhere; keep the text untouched.
+    const keepComment = root.querySelector('[data-comment]') ? root.querySelector('[data-comment]').value : '';
+    if (d.id) { const fresh = S.state.posts.find(p => p.id === d.id); if (fresh) d.original = fresh; }
     const ids = new Set(S.state.accounts.map(a => a.id));
     d.targets = new Set([...d.targets].filter(id => ids.has(id)));
     renderTargets(); renderCounters(); renderWarnings(); renderSide();
+    const ci = root.querySelector('[data-comment]'); if (ci && keepComment) ci.value = keepComment;
   },
   unmount() {
+    if (d.readOnly) return;
     root.removeEventListener('click', onClick);
     root.removeEventListener('input', onInput);
     root.removeEventListener('paste', onPaste);
     root.removeEventListener('dragover', onDragOver);
     root.removeEventListener('dragleave', onDragLeave);
     root.removeEventListener('drop', onDrop);
+    root.removeEventListener('keydown', onCommentKey);
     if (!d.saved && !d.id && (d.text.trim() || d.media.length)) saveWip();
   }
 };

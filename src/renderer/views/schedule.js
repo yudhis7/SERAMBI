@@ -5,7 +5,8 @@ import { icon } from '../icons.js';
 import {
   esc, fmtTime, fmtDayLong, fmtMonth, relDay, startOfDay, addDays, dayKey, sameDay, snippet, confirmDialog, toast, showMenu
 } from '../util.js';
-import { S, api, go, emit, account, platformOf, tile, tilesFor, statusChip, targetChip, mediaTag, postTime } from '../ctx.js';
+import { S, api, go, emit, account, platformOf, tile, tilesFor, statusChip, targetChip, mediaTag, postTime, perm, inTeam, memberName } from '../ctx.js';
+import { promptDialog } from '../util.js';
 
 let root, tb;
 const WEEKDAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
@@ -31,7 +32,7 @@ function renderTitlebar() {
       <button class="${S.scheduleMode === 'month' ? 'on' : ''}" data-view="month">${icon('calendar', 15)}Kalender</button>
       <button class="${S.scheduleMode === 'list' ? 'on' : ''}" data-view="list">${icon('list', 15)}Daftar</button>
     </div>
-    <button class="btn primary sm" data-compose>${icon('square-pen', 15)}Tulis postingan</button>`;
+    ${perm('post.write') ? `<button class="btn primary sm" data-compose>${icon('square-pen', 15)}Tulis postingan</button>` : ''}`;
 }
 
 function calendar() {
@@ -48,10 +49,13 @@ function calendar() {
     const day = addDays(start, i);
     const inMonth = new Date(day).getMonth() === ref.getMonth();
     const posts = postsOnDay(day);
-    const max = 3;
+    const key = dayKey(day);
+    const moments = S.moments.filter(m => m.date === key && m.kind !== 'gajian');
+    const max = moments.length ? 2 : 3;
     cells.push(`
       <div class="cal-day ${inMonth ? '' : 'other'} ${sameDay(day, today) ? 'today' : ''} ${sameDay(day, sel) ? 'selected' : ''}" data-day="${day}" role="button" tabindex="0" aria-label="${esc(fmtDayLong(day))}${posts.length ? `, ${posts.length} postingan` : ''}">
         <span class="num">${new Date(day).getDate()}</span>
+        ${moments.slice(0, 1).map(m => `<span class="cal-moment ${m.kind}" title="${esc(m.name)}${m.estimate ? ' (perkiraan)' : ''}">${esc(m.name)}</span>`).join('')}
         ${posts.slice(0, max).map(p => `
           <button class="cal-chip ${p.status}" data-post="${p.id}" title="${esc(snippet(p.text, 90) || 'Postingan')}">
             <span class="t">${esc(fmtTime(p.scheduledAt))}</span><span class="s">${esc(snippet(p.text, 40) || 'Media')}</span>
@@ -66,7 +70,10 @@ function calendar() {
 
 function postCard(p) {
   const time = p.scheduledAt ? fmtTime(p.scheduledAt) : '';
-  const canAssist = p.status === 'due' || p.status === 'scheduled';
+  const canAssist = (p.status === 'due' || p.status === 'scheduled') && perm('post.write');
+  const team = inTeam();
+  const nComments = team ? S.state.comments.filter(c => c.postId === p.id).length : 0;
+  const who = team ? memberName(p.assigneeId || p.createdBy) : '';
   return `
     <div class="day-post">
       <div class="top"><span class="t">${esc(time)}</span>${statusChip(p.status)}<span class="grow"></span>
@@ -76,9 +83,12 @@ function postCard(p) {
       <div class="targets-mini">
         ${p.targets.map(t => { const a = account(t.accountId); return a ? `<div>${tile(a, 'xs')}<span class="grow">${esc(a.name)}</span>${targetChip(t)}</div>` : ''; }).join('')}
       </div>
+      ${team ? `<div class="post-meta">${who ? `${icon('user-round', 13)}<span>${esc(who)}</span>` : ''}${nComments ? `${icon('message-square', 13)}<span>${nComments} komentar</span>` : ''}</div>` : ''}
+      ${p.status === 'review' && p.approval ? `<div class="approval-note">${icon('hourglass', 14)}<span>Diajukan ${esc(p.approval.requestedByName || '')}${p.approval.note ? `: “${esc(p.approval.note)}”` : ''}</span></div>` : ''}
       <div class="btns">
+        ${p.status === 'review' && perm('post.approve') ? `<button class="btn primary sm" data-approve="${p.id}">${icon('check', 14)}Setujui</button><button class="btn sm" data-reject="${p.id}">${icon('x', 14)}Tolak</button>` : ''}
         ${canAssist ? `<button class="btn ${p.status === 'due' ? 'warn' : ''} sm" data-assist="${p.id}">${icon('clipboard-copy', 14)}${p.status === 'due' ? 'Bantu posting' : 'Posting sekarang'}</button>` : ''}
-        <button class="btn sm" data-edit="${p.id}">${icon('pencil', 14)}Edit</button>
+        <button class="btn sm" data-edit="${p.id}">${icon(perm('post.write') ? 'pencil' : 'eye', 14)}${perm('post.write') ? 'Edit' : 'Lihat'}</button>
       </div>
     </div>`;
 }
@@ -95,9 +105,16 @@ function dayPanel() {
       </div>
       <div class="day-panel-body">
         ${posts.length ? posts.map(postCard).join('') : `<div class="empty" style="margin:0 8px"><p>${isPast ? 'Tidak ada postingan di hari ini.' : 'Belum ada postingan di hari ini.'}</p></div>`}
-        ${!isPast ? `<div style="padding:4px 8px"><button class="btn block" data-new-day="${day}">${icon('plus', 16)}Jadwalkan di hari ini</button></div>` : ''}
+        ${dayMoments(day)}
+        ${!isPast && perm('post.write') ? `<div style="padding:4px 8px"><button class="btn block" data-new-day="${day}">${icon('plus', 16)}Jadwalkan di hari ini</button></div>` : ''}
       </div>
     </aside>`;
+}
+
+function dayMoments(day) {
+  const ms = S.moments.filter(m => m.date === dayKey(day));
+  if (!ms.length) return '';
+  return `<div class="day-moments">${ms.map(m => `<div class="day-moment ${m.kind}">${icon('calendar-clock', 15)}<div><b>${esc(m.name)}${m.estimate ? ' <span class="faint">(perkiraan)</span>' : ''}</b><span>${esc(m.idea)}</span></div></div>`).join('')}</div>`;
 }
 
 function groupTitle(ts) {
@@ -112,17 +129,18 @@ function listView() {
   const counts = {
     all: all.length,
     scheduled: all.filter(p => p.status === 'scheduled').length,
+    review: all.filter(p => p.status === 'review').length,
     due: all.filter(p => p.status === 'due').length,
     draft: all.filter(p => p.status === 'draft').length,
     posted: all.filter(p => p.status === 'posted').length
   };
-  const labels = { all: 'Semua', scheduled: 'Terjadwal', due: 'Perlu tindakan', draft: 'Draf', posted: 'Terposting' };
+  const labels = { all: 'Semua', scheduled: 'Terjadwal', ...(counts.review || inTeam() ? { review: 'Menunggu persetujuan' } : {}), due: 'Perlu tindakan', draft: 'Draf', posted: 'Terposting' };
   let list = f === 'all' ? all.slice() : all.filter(p => p.status === f);
-  const asc = f === 'scheduled' || f === 'due';
+  const asc = f === 'scheduled' || f === 'due' || f === 'review';
   list.sort((a, b) => asc ? postTime(a) - postTime(b) : postTime(b) - postTime(a));
   if (f === 'all') {
     // upcoming first (soonest on top), then everything else newest first
-    const up = list.filter(p => p.status === 'scheduled' || p.status === 'due').sort((a, b) => postTime(a) - postTime(b));
+    const up = list.filter(p => p.status === 'scheduled' || p.status === 'due' || p.status === 'review').sort((a, b) => postTime(a) - postTime(b));
     const rest = list.filter(p => !up.includes(p)).sort((a, b) => postTime(b) - postTime(a));
     list = [...up, ...rest];
   }
@@ -165,9 +183,14 @@ function render() {
 function postMenu(anchor, id) {
   const p = S.state.posts.find(x => x.id === id);
   if (!p) return;
+  if (!perm('post.write')) {
+    showMenu(anchor, [{ label: 'Lihat', icon: 'eye', onClick: () => go({ name: 'compose', postId: id }) }, { label: 'Salin teks', icon: 'copy', onClick: async () => { await api.copyText(p.text); toast('Teks disalin'); } }]);
+    return;
+  }
   showMenu(anchor, [
+    ...(p.status === 'review' && perm('post.approve') ? [{ label: 'Setujui', icon: 'check', onClick: () => decide(id, true) }, { label: 'Tolak', icon: 'x', onClick: () => decide(id, false) }, 'sep'] : []),
     { label: 'Edit', icon: 'pencil', onClick: () => go({ name: 'compose', postId: id }) },
-    ...(p.status !== 'posted' && p.status !== 'draft' ? [{ label: 'Bantu posting', icon: 'clipboard-copy', onClick: () => emit('assist', id) }] : []),
+    ...(p.status !== 'posted' && p.status !== 'draft' && p.status !== 'review' ? [{ label: 'Bantu posting', icon: 'clipboard-copy', onClick: () => emit('assist', id) }] : []),
     { label: 'Duplikat jadi draf', icon: 'copy-plus', onClick: async () => { await api.duplicatePost(id); toast('Salinan disimpan sebagai draf'); } },
     { label: 'Salin teks', icon: 'copy', onClick: async () => { await api.copyText(p.text); toast('Teks disalin'); } },
     'sep',
@@ -176,6 +199,13 @@ function postMenu(anchor, id) {
       if (ok) { await api.removePost(id); toast('Postingan dihapus'); }
     } }
   ]);
+}
+
+async function decide(id, approve) {
+  const note = approve ? '' : await promptDialog({ title: 'Tolak postingan', label: 'Alasan (dikirim ke penulis)', placeholder: 'Misalnya: ganti foto, harga salah', maxlength: 300, confirm: 'Tolak' });
+  if (!approve && note === null) return;
+  await api.decidePost({ id, approve, note });
+  toast(approve ? 'Disetujui dan masuk jadwal' : 'Dikembalikan ke penulis');
 }
 
 async function startNow(id) {
@@ -205,6 +235,8 @@ function onClick(e) {
     return;
   }
   if (ds.assist) return startNow(ds.assist);
+  if (ds.approve) return decide(ds.approve, true);
+  if (ds.reject) return decide(ds.reject, false);
   if (ds.edit) return go({ name: 'compose', postId: ds.edit });
   if (ds.newDay) return go({ name: 'compose', date: Number(ds.newDay) });
   if (ds.filter) { S.scheduleFilter = ds.filter; render(); return; }

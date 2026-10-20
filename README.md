@@ -2,103 +2,107 @@
 
 Hak cipta © 2026 **Yudhistira** (yudhie7@gmail.com). Seluruh hak dilindungi.
 
-Aplikasi desktop untuk Windows dan macOS yang mengumpulkan media sosial dan toko online dalam satu jendela: **Instagram, Facebook, X, TikTok, WhatsApp, Telegram, Tokopedia, dan Shopee**. Dilengkapi penyusun postingan, kalender jadwal, dan pembaruan otomatis.
+Aplikasi desktop untuk Windows dan macOS yang membantu usaha lokal **mengelola media sosial dan toko online, ditemukan di sekitar, beriklan lebih hemat, membangun kepercayaan lewat ulasan, dan mengotomatiskan pemasaran harian**, dengan perlindungan data pelanggan sesuai UU Pelindungan Data Pribadi.
+
+Platform: **Instagram, Facebook, X, TikTok, WhatsApp, Telegram, Tokopedia, dan Shopee**.
+
+## Paket
+
+| | SOLOPreneur | SMALPreneur | MediumPreneur |
+| --- | --- | --- | --- |
+| Untuk | Pemilik yang mengurus sendiri | Tim 5–10 orang | Tim 10–30 orang, beberapa cabang |
+| Harga | Gratis | Kunci lisensi | Kunci lisensi |
+| Lokasi/cabang | 1 | 3 | 25 |
+| Otomatisasi aktif | 5 | 25 | Tanpa batas |
+| Tumbuh lokal (SEO, iklan, ulasan) | ✓ | ✓ | ✓ |
+| Pusat Kepercayaan & alat UU PDP | ✓ | ✓ | ✓ |
+| Ruang kerja tim terenkripsi | — | ✓ | ✓ |
+| Persetujuan postingan & komentar | — | ✓ | ✓ |
+| Peran Pengamat & akses per akun | — | — | ✓ |
+
+Semua paket bisa mencoba fitur MediumPreneur **gratis 14 hari**. Kunci lisensi diperiksa di komputer tanpa internet (tanda tangan Ed25519).
 
 ## Yang bisa dilakukan
 
-- **Semua akun di satu tempat.** Tiap akun dibuka dari halaman resminya dan login-nya tersimpan. Bisa beberapa akun di platform yang sama.
-- **Media sosial dan toko online dipisah rapi** di panel kiri.
-- **Toko online (Tokopedia dan Shopee).** Masuk ke Seller Center langsung dari Serambi untuk mengurus pesanan, chat pembeli, dan promosi.
-  - **Link toko:** simpan alamat toko yang dilihat pembeli, lalu sisipkan ke postingan media sosial dengan satu klik (tombol *Link toko*). Pembeli langsung diarahkan ke tokomu.
-  - **Pintasan halaman:** simpan halaman Seller Center yang sering dibuka (Pesanan, Chat, Promosi, Iklan) lewat ikon penanda di bar atas.
-  - **Halaman awal:** pilih halaman yang langsung terbuka setiap kali akun itu dibuka.
-  - **Tulis promosi:** teks promosi bisa dikirim ke akun toko. Serambi membuka Seller Center dan menyalin teksnya untuk ditempel di menu promosi, chat, atau deskripsi produk.
-- **TikTok:** saat waktunya posting, Serambi langsung membuka halaman unggah TikTok dan menyalin keterangannya.
-- **Tulis sekali, kirim ke banyak akun**, dengan pratinjau dan batas karakter tiap platform.
-- **Jadwal** dalam bentuk kalender dan daftar.
-- **Telegram otomatis** lewat bot. Platform lain dibantu: Serambi memberi notifikasi, membuka akunnya, dan menyalin teks atau gambar.
-- **Pembaruan otomatis** dari GitHub Releases.
-- Templat teks, tema terang/gelap, pintasan keyboard, dan cadangan data.
+### Media sosial & toko online
+- Semua akun di satu jendela; login tiap akun tersimpan, bisa beberapa akun di platform yang sama.
+- Tulis sekali, kirim ke banyak akun, dengan pratinjau dan batas karakter tiap platform. Jadwal dalam kalender dan daftar.
+- Telegram otomatis lewat bot; platform lain dibantu (notifikasi, buka akun, salin teks/gambar).
+- Toko Tokopedia & Shopee: Seller Center di dalam Serambi, link toko, pintasan halaman, tulis promosi.
+
+### Tumbuh lokal
+- **Ditemukan di sekitar:** profil bisnis, lokasi/cabang, daftar periksa Profil Bisnis Google, pemeriksa **NAP** (nama, alamat, nomor seragam), **pemeriksa SEO lokal** untuk situs, dan pembuat kode **schema LocalBusiness**.
+- **Iklan lokal:** perencana anggaran (klik, pembeli, laba, batas impas, ROAS), kampanye dengan hasil, penyusun **iklan responsif Google** (15 judul/4 deskripsi dengan pemeriksaan aturan), teks iklan Meta, kata kunci lokal & negatif, link **UTM** dan **QR**. Iklan dibuat di konsol resmi; Serambi menyiapkan isinya.
+- **Ulasan:** link ulasan Google dari Place ID, **kartu QR siap cetak (PDF)**, kirim permintaan ulasan lewat WhatsApp, kotak ulasan dari Google/marketplace, templat balasan, jadikan testimoni.
+- **Otomatisasi harian:** minta ulasan setelah berkunjung, ucapan ulang tahun, sapa pelanggan lama, posting rutin mingguan, konten momen (kalender libur nasional & cuti bersama 2026–2027, Harbolnas, gajian), update Profil Bisnis Google, pengingat balas ulasan, laporan mingguan, dan pemeriksaan masa simpan data. Otomatisasi hanya *menyiapkan* pekerjaan; pesan ke pelanggan baru terkirim setelah kamu menekan kirim.
+- **Skor pertumbuhan lokal** dan langkah berikutnya yang paling berdampak.
+
+### Pelanggan
+Daftar pelanggan dengan **persetujuan per tujuan** (promo WhatsApp, permintaan ulasan, ucapan ulang tahun), riwayat persetujuan, impor CSV, ekspor, pembatasan pemrosesan, salinan data, dan penghapusan.
+
+### Tim (SMALPreneur & MediumPreneur)
+Ruang kerja di **folder bersama** yang sudah kamu punya (Google Drive, OneDrive, Dropbox, atau folder jaringan), **tanpa server**. Semua berkas dienkripsi **AES-256-GCM** di komputer sebelum disimpan; kunci dibagikan ke tiap komputer anggota lewat **X25519**. Peran Pemilik/Admin/Editor/Pengamat, akses data pelanggan terpisah, persetujuan postingan, komentar, tugas tim, dan **ganti kunci otomatis** saat anggota dikeluarkan. Pemilik menyimpan **kode pemulihan**.
+
+### Pusat Kepercayaan (UU No. 27 Tahun 2022)
+- **Keamanan:** kunci aplikasi PIN dengan kunci otomatis, enkripsi data di komputer (DPAPI Windows / Keychain macOS), cadangan terenkripsi kata sandi, keluar dari semua akun.
+- **Kepatuhan:** daftar periksa 12 butir, catatan kegiatan pemrosesan (Pasal 31), pemberitahuan privasi berversi (Pasal 21), persetujuan (Pasal 20 & 22), permintaan hak subjek data dengan tenggat 3×24 jam, insiden dengan surat pemberitahuan (Pasal 46), penanggung jawab data (Pasal 53), cek risiko tinggi (Pasal 34), kebijakan retensi, dan **log audit berantai hash**.
+- **Laporan kepatuhan (PDF)** dan halaman transparansi.
+
+Alat ini membantu menjalankan kewajiban, **bukan nasihat hukum**.
+
+### Contoh penggunaan
+Sembilan contoh usaha lokal (fiktif) yang bisa diikuti atau **diterapkan dengan satu klik**: kedai kopi, laundry, kue rumahan, barbershop, klinik gigi, bengkel, bimbel, butik batik, dan rumah makan.
 
 ## Memasang
 
 ### Windows (10 dan 11)
-1. Jalankan `Serambi-Setup-1.1.0.exe`.
-2. Jika muncul *Windows protected your PC*, klik **More info → Run anyway**. Ini muncul karena installer belum ditandatangani sertifikat berbayar.
-3. Baca dan setujui lisensi, lalu ikuti langkah pemasangan.
+1. Jalankan `Serambi-Setup-1.2.0.exe`.
+2. Jika muncul *Windows protected your PC*, klik **More info → Run anyway** (installer belum ditandatangani sertifikat berbayar).
+3. Setujui lisensi, lalu ikuti langkah pemasangan.
 
 ### macOS (11 Big Sur atau lebih baru)
-1. Pilih berkas sesuai Mac kamu: `…-mac-arm64.zip` untuk chip Apple (M1–M4), atau `…-mac-x64.zip` untuk Intel.
-2. Buka zip, lalu seret **Serambi** ke folder **Applications**.
-3. Pembukaan pertama: klik kanan Serambi → **Open** → **Open**. Di macOS 15 ke atas: buka sekali, lalu **System Settings → Privacy & Security → Open Anyway**.
+1. Pilih `Serambi-1.2.0-arm64.dmg` (chip Apple M1–M4) atau `Serambi-1.2.0-x64.dmg` (Intel).
+2. Seret **Serambi** ke **Applications**.
+3. Pembukaan pertama: klik kanan → **Open** → **Open**. Di macOS 15 ke atas: **System Settings → Privacy & Security → Open Anyway**.
+4. Sejak 1.2, data dienkripsi dengan Keychain. Setelah memperbarui Serambi, macOS bisa meminta izin Keychain sekali; masukkan kata sandi login Mac lalu pilih **Selalu Izinkan**.
 
 ## Pembaruan otomatis
+Serambi memeriksa Release terbaru di **github.com/yudhis7/serambi** 15 detik setelah dibuka lalu tiap 6 jam. Windows mengunduh dan memasang sendiri; Mac memberi tahu dan menyediakan tombol unduh.
 
-Serambi memeriksa versi baru 15 detik setelah dibuka, lalu setiap 6 jam, dari Release terbaru di repositori GitHub **yudhis7/serambi**.
+Untuk merilis versi baru: naikkan `version` di `package.json`, tulis `.github/release-notes/vX.Y.Z.md`, lalu push ke `main`. Workflow **Rilis Serambi** membangun installer dan menerbitkan Release.
 
-- **Windows:** versi baru diunduh di latar belakang dan terpasang otomatis saat Serambi ditutup. Bisa juga langsung lewat *Mulai ulang & perbarui* (di Pengaturan, panel kiri, atau menu tray).
-- **Mac:** Serambi memberi tahu ada versi baru dan menyediakan tombol unduh. Pemasangan otomatis penuh di Mac baru bisa dilakukan setelah aplikasi ditandatangani Apple Developer ID.
-
-Pengguna versi 1.0.0 perlu memasang 1.1.0 secara manual sekali. Mulai 1.1.0, pembaruan berjalan otomatis.
-
-### Menyiapkan server pembaruan (sekali saja)
-
-1. Buat akun GitHub dengan username **yudhis7** (atau pakai yang sudah ada), lalu buat repositori **publik** bernama **serambi**.
-   Kalau username atau nama repo berbeda, ubah `UPDATE_OWNER` / `UPDATE_REPO` di `src/main/config.js` **dan** `build.publish` di `package.json`, lalu buat ulang installer.
-2. Unggah seluruh kode sumber ke repositori itu.
-3. Push kode ke branch `main`. Workflow GitHub Actions **Rilis Serambi** otomatis membangun installer Windows dan Mac, lalu menerbitkan Release sesuai versi di `package.json`. Riwayat versi lama (1.0.0) ikut diterbitkan sekali.
-
-### Menerbitkan versi berikutnya
-
-1. Naikkan `"version"` di `package.json`, misalnya ke `1.2.0`. Tulis catatan rilis di `.github/release-notes/v1.2.0.md` (opsional).
-2. Commit dan push ke `main`.
-3. Sekitar 10–15 menit kemudian Release `v1.2.0` terbit, dan semua Serambi yang terpasang akan menemukannya sendiri.
-
-## Mulai memakai
-
-1. **Tambah akun.** Klik *Tambah akun*, pilih media sosial atau toko online, lalu masuk seperti biasa.
-2. **Atur link toko** (untuk Tokopedia/Shopee): menu ⋯ akun toko → *Atur link toko*. Isi alamat toko yang dilihat pembeli, misalnya `https://shopee.co.id/namatoko`.
-3. **Tulis postingan** (Ctrl/⌘+N), pilih akun tujuan, klik *Link toko* untuk menyisipkan alamat tokomu, lalu pilih *Sekarang*, *Jadwalkan*, atau *Draf*.
-4. **Saat waktunya tiba**, klik notifikasinya atau *Bantu posting*, tempel dengan Ctrl/⌘+V, lalu klik *Selesai*.
-
-### Posting otomatis ke Telegram
-1. Di Telegram, buka **@BotFather**, kirim `/newbot`, salin token-nya.
-2. Tambahkan bot ke channel atau grup sebagai admin yang boleh mengirim pesan.
-3. Di Serambi: **Pengaturan → Posting otomatis ke Telegram**, isi token dan `@namachannel`, klik *Hubungkan & tes*.
+## Kunci lisensi (khusus pemilik Serambi)
+Lihat **PANDUAN-LISENSI.md**. Singkatnya: kunci diterbitkan dari menu **Bantuan → Terbitkan kunci lisensi** atau `node tools/terbitkan-lisensi.js`, memakai berkas kunci privat `serambi-penerbit-lisensi.pem` yang **tidak boleh** masuk repositori.
 
 ## Perlu diketahui
-
-- **Jadwal berjalan selama Serambi terbuka**, termasuk saat disembunyikan di tray (Windows) atau Dock (Mac).
-- **Instagram, Facebook, X, TikTok, WhatsApp, Tokopedia, dan Shopee tidak bisa diposting otomatis penuh.** Platform-platform ini hanya membuka posting otomatis lewat API bisnis yang harus disetujui. Serambi mengingatkan, membuka akunnya, dan menyiapkan teksnya.
-- **Shopee Feed** hanya bisa diposting dari aplikasi Shopee di HP.
-- **Seller Center Tokopedia** kini bergabung dengan TikTok Shop di `seller-id.tokopedia.com`.
-- **Masuk dengan Google** sering ditolak Google di aplikasi seperti ini. Masuklah dengan email/nomor HP dan kata sandi.
-- **Data tersimpan di komputermu sendiri:** Windows `%APPDATA%\Serambi`, macOS `~/Library/Application Support/Serambi`. Token bot disimpan terenkripsi.
-- Serambi tidak berafiliasi dengan platform-platform di atas.
+- Jadwal dan otomatisasi berjalan selama Serambi terbuka, termasuk saat disembunyikan di tray/Dock.
+- Instagram, Facebook, X, TikTok, WhatsApp, Tokopedia, dan Shopee tidak bisa diposting otomatis penuh tanpa API bisnis yang disetujui; Serambi mengingatkan dan menyiapkan teksnya.
+- Konsol resmi Google dan Meta dibuka di browser biasa karena Google sering menolak login dari jendela aplikasi.
+- Data tersimpan di komputermu: Windows `%APPDATA%\Serambi`, macOS `~/Library/Application Support/Serambi`. Tidak ada server Serambi dan tidak ada pelacakan.
+- Serambi tidak berafiliasi dengan platform-platform di atas, Google, atau Meta.
 
 ## Pintasan keyboard
 
 | Aksi | Windows | macOS |
 | --- | --- | --- |
 | Tulis postingan | Ctrl+N | ⌘N |
-| Buka akun ke-1…9 (urutan panel kiri) | Ctrl+1…9 | ⌘1…9 |
+| Buka akun ke-1…9 | Ctrl+1…9 | ⌘1…9 |
 | Akun berikutnya / sebelumnya | Ctrl+Tab / Ctrl+Shift+Tab | sama |
 | Beranda / Jadwal | Ctrl+Shift+H / Ctrl+Shift+J | ⌘⇧H / ⌘⇧J |
+| Kunci Serambi | Ctrl+Shift+L | ⌘⇧L |
 | Muat ulang akun | Ctrl+R atau F5 | ⌘R |
 | Perbesar / perkecil / normal | Ctrl+= / Ctrl+− / Ctrl+0 | ⌘= / ⌘− / ⌘0 |
 | Pengaturan | Ctrl+, | ⌘, |
 
 ## Membangun dari kode sumber
-
 Butuh Node.js 20 atau lebih baru.
 
 ```bash
 npm install
-npm start            # jalankan dalam mode pengembangan
-npm run dist:win     # installer Windows + latest.yml di folder dist/
+npm start            # mode pengembangan
+npm run dist:win     # installer Windows
 npm run dist:mac     # DMG dan zip Mac (jalankan di Mac)
 ```
 
 ## Hak cipta dan lisensi
-
-Serambi adalah milik **Yudhistira** (yudhie7@gmail.com). Pemakaian diatur oleh berkas `LICENSE`: boleh dipasang dan dipakai, tetapi tidak boleh disalin, diubah, atau didistribusikan ulang tanpa izin tertulis. Komponen sumber terbuka di dalamnya (Electron, electron-updater, ikon Lucide, huruf Plus Jakarta Sans) tetap tunduk pada lisensinya masing-masing, lihat `THIRD_PARTY_NOTICES.md`.
+Serambi adalah milik **Yudhistira** (yudhie7@gmail.com). Pemakaian diatur oleh `LICENSE`. Komponen sumber terbuka (Electron, electron-updater, node-qrcode, ikon Lucide, huruf Plus Jakarta Sans) tunduk pada lisensinya masing-masing, lihat `THIRD_PARTY_NOTICES.md`.

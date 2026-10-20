@@ -2,8 +2,10 @@
 //
 // Pengaturan — appearance, background behaviour, accounts, Telegram bots, templates, backup.
 import { icon } from '../icons.js';
-import { esc, toast, confirmDialog, promptDialog, openModal, snippet } from '../util.js';
-import { S, api, go, emit, account, platformOf, tile, modKey, KIND_LABEL, kindOf, orderedAccounts, updateLine } from '../ctx.js';
+import { esc, toast, confirmDialog, promptDialog, openModal, snippet, fmtDateLong, fmtDate } from '../util.js';
+import { S, api, go, emit, account, platformOf, tile, modKey, KIND_LABEL, kindOf, orderedAccounts, updateLine, perm, inTeam, planBadge } from '../ctx.js';
+import { plansCompare } from './team.js';
+import { restoreBackup } from './trust.js';
 
 let root, scrollTo;
 
@@ -65,12 +67,45 @@ function updateSection() {
       </section>`;
 }
 
+function planSection() {
+  const pl = S.state.plan;
+  const lic = pl.license;
+  const owner = S.state.me.role === 'owner';
+  const src = pl.source === 'license' ? `Lisensi untuk <b>${esc(lic.name || '—')}</b>${lic.email ? ` (${esc(lic.email)})` : ''} · ${lic.seats} pengguna · ${lic.expiresAt ? 'berlaku sampai ' + esc(fmtDateLong(lic.expiresAt)) : 'tanpa batas waktu'}`
+    : pl.source === 'trial' ? `Uji coba MediumPreneur, <b>${pl.daysLeft} hari lagi</b> (sampai ${esc(fmtDateLong(pl.trialEndsAt))})`
+    : pl.lapsed === 'license' ? 'Lisensi sudah habis. Kembali ke paket gratis.' : pl.lapsed === 'trial' ? 'Masa uji coba sudah berakhir.' : 'Gratis untuk satu pengguna, tanpa batas waktu.';
+  return `
+      <section class="settings-group" id="sec-plan">
+        <h2>Paket & lisensi</h2>
+        <p>${inTeam() && !owner ? 'Paket mengikuti ruang kerja tim yang diaktifkan pemilik.' : 'SOLOPreneur gratis. SMALPreneur dan MediumPreneur diaktifkan dengan kunci lisensi dari pemilik Serambi; diperiksa di komputer ini tanpa internet.'}</p>
+        <div class="set-list">
+          <div class="set-row"><span class="plan-ic ${pl.id}">${icon(pl.id === 'solo' ? 'user-round' : pl.id === 'small' ? 'users' : 'building-2', 20)}</span>
+            <div class="meta"><b>${esc(pl.name)}</b><span>${src}</span></div>
+            <div class="acts">
+              ${(!inTeam() || owner) && pl.source === 'free' && !pl.trialUsed ? `<button class="btn sm" data-trial>${icon('rocket', 15)}Coba ${S.trialDays} hari</button>` : ''}
+              ${(!inTeam() || owner) ? `<button class="btn primary sm" data-activate>${icon('key-round', 15)}${pl.source === 'license' ? 'Ganti lisensi' : 'Aktifkan lisensi'}</button>` : ''}
+              ${(!inTeam() || owner) && lic ? `<button class="btn ghost sm" data-unlicense>Lepas</button>` : ''}
+            </div></div>
+          <div class="set-row"><div class="meta"><b>Ingin SMALPreneur atau MediumPreneur?</b><span>Hubungi pemilik Serambi untuk kunci lisensi sesuai jumlah anggota timmu.</span></div>
+            <button class="btn sm" data-request-license>${icon('mail', 15)}Minta kunci lisensi</button></div>
+        </div>
+        <details class="plan-details"><summary>Bandingkan paket ${icon('chevron-down', 15)}</summary>${plansCompare()}</details>
+      </section>`;
+}
+
 function render() {
   const { settings, accounts, templates } = S.state;
   const tgs = accounts.filter(a => a.platform === 'telegram');
   const mk = modKey();
   root.innerHTML = `
     <div class="page narrow" style="padding-top:12px">
+      ${planSection()}
+      <section class="settings-group">
+        <h2>Profil</h2>
+        <p>Namamu dipakai di log audit, komentar tim, dan tugas.</p>
+        <div class="set-list"><div class="set-row"><div class="meta"><b>Nama pengguna</b><span>${inTeam() ? 'Di ruang kerja tim, nama diatur di menu Tim.' : 'Misalnya “Rina (pemilik)”.'}</span></div>
+          <input class="input sm-input" data-username value="${esc(inTeam() ? S.state.me.name : (settings.userName || ''))}" maxlength="60" placeholder="Pemilik" ${inTeam() ? 'disabled' : ''} style="width:220px"></div></div>
+      </section>
       <section class="settings-group">
         <h2>Tampilan</h2>
         <p>Pilih tema terang atau gelap, atau ikuti pengaturan komputermu.</p>
@@ -142,11 +177,12 @@ function render() {
 
       ${updateSection()}
 
-      <section class="settings-group">
+      <section class="settings-group" id="sec-backup">
         <h2>Cadangan</h2>
-        <p>Simpan daftar akun, postingan, dan templat ke satu berkas. Login dan token bot tidak ikut tersimpan.</p>
-        <div style="display:flex;gap:8px">
-          <button class="btn" data-export>${icon('download', 16)}Simpan cadangan</button>
+        <p>Simpan akun, postingan, templat, pelanggan, ulasan, dan catatan kepatuhan ke satu berkas. Login dan token bot tidak ikut. Karena berisi data pelanggan, gunakan cadangan terenkripsi.${settings.lastBackupAt ? ` Cadangan terenkripsi terakhir: ${esc(fmtDate(settings.lastBackupAt))}.` : ''}</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn primary" data-export-enc>${icon('file-lock', 16)}Cadangan terenkripsi</button>
+          <button class="btn" data-export>${icon('download', 16)}Tanpa kata sandi</button>
           <button class="btn" data-import>${icon('upload', 16)}Pulihkan dari cadangan</button>
         </div>
       </section>
@@ -162,6 +198,7 @@ function render() {
           <span>Muat ulang akun</span><span class="kbd">${mk}+R</span>
           <span>Perbesar / perkecil / normal</span><span class="kbd">${mk}+= / ${mk}+− / ${mk}+0</span>
           <span>Pengaturan</span><span class="kbd">${mk}+,</span>
+          <span>Kunci Serambi</span><span class="kbd">${mk}+Shift+L</span>
         </div></div>
       </section>
 
@@ -169,7 +206,7 @@ function render() {
         <span>${icon('copyright', 15)}</span>
         <div><b>${esc(S.owner.copyright)}</b>
           <span>Serambi ${esc(S.version)} · Pemilik dan pengembang: ${esc(S.owner.name)} · <button class="link" data-mail>${esc(S.owner.email)}</button> · <button class="link" data-about>Tentang Serambi</button></span>
-          <span>Semua data tersimpan di komputer ini.</span></div>
+          <span>${inTeam() ? 'Data tersimpan di komputer ini dan di folder tim (terenkripsi).' : 'Semua data tersimpan di komputer ini.'} <button class="link" data-trust>Pusat Kepercayaan</button></span></div>
       </div>
     </div>`;
 }
@@ -243,17 +280,89 @@ async function onClick(e) {
     if (ok) api.removeTemplate(t.id);
     return;
   }
-  if ('export' in ds) { const ok = await api.exportBackup(); if (ok) toast('Cadangan disimpan'); return; }
-  if ('import' in ds) {
-    const res = await api.importBackup();
-    if (res.ok) toast(`Dipulihkan: ${res.accounts} akun dan ${res.posts} postingan. Masuk lagi ke tiap akun.`, { ms: 6000 });
-    else if (res.error) toast(res.error, { kind: 'err' });
+  if ('exportEnc' in ds) return go({ name: 'trust', tab: 'security' });
+  if ('export' in ds) {
+    if (S.state.customers.length) {
+      const ok = await confirmDialog({ title: 'Simpan tanpa kata sandi?', message: `Cadangan berisi ${S.state.customers.length} data pelanggan. Tanpa kata sandi, siapa pun yang mendapat berkasnya bisa membaca data itu. Disarankan memakai cadangan terenkripsi.`, confirm: 'Tetap simpan' });
+      if (!ok) return;
+    }
+    const r = await api.exportBackup({}); if (r && r.ok) toast('Cadangan disimpan'); return;
   }
+  if ('import' in ds) return restoreBackup();
+  if ('trust' in ds) return go({ name: 'trust' });
+  if ('trial' in ds) { try { await api.startTrial(); toast(`Uji coba MediumPreneur ${S.trialDays} hari dimulai`); } catch (e) { toast(e.message, { kind: 'err' }); } return; }
+  if ('activate' in ds) return activateDialog();
+  if ('unlicense' in ds) { if (await confirmDialog({ title: 'Lepas lisensi?', message: 'Serambi kembali ke paket SOLOPreneur. Data tidak hilang; fitur tim menjadi hanya-lihat.', confirm: 'Lepas lisensi', danger: true })) { await api.removeLicense(); toast('Lisensi dilepas'); } return; }
+  if ('requestLicense' in ds) return api.openMail('Permintaan kunci lisensi Serambi (SMALPreneur/MediumPreneur)');
+}
+
+function activateDialog() {
+  const m = openModal({
+    title: 'Aktifkan kunci lisensi',
+    body: `<p>Tempel kunci lisensi yang kamu terima (diawali <code>SRB1.</code>). Kunci diperiksa di komputer ini, tanpa internet.</p>
+      <div class="field"><textarea class="input textarea code-input" rows="4" data-key spellcheck="false" placeholder="SRB1.…"></textarea></div><p class="error-text" data-err></p>`,
+    foot: `<button class="btn ghost" data-no>Batal</button><button class="btn primary" data-yes>Aktifkan</button>`
+  });
+  m.el.querySelector('[data-no]').onclick = () => m.close();
+  m.el.querySelector('[data-yes]').onclick = async () => {
+    const r = await api.activateLicense(m.el.querySelector('[data-key]').value);
+    if (!r.ok) { m.el.querySelector('[data-err]').textContent = r.error; return; }
+    m.close();
+    toast(`${r.plan.name} aktif untuk ${r.plan.seats} pengguna${r.warning ? '. ' + r.warning : ''}`, { ms: 7000 });
+  };
+}
+
+/** Owner-only tool (Bantuan → Terbitkan kunci lisensi): signs licence keys with the private key file. */
+export function openLicenseIssuer() {
+  const issued = S.state.settings.issuedLicenses || [];
+  const m = openModal({
+    title: 'Terbitkan kunci lisensi',
+    wide: true,
+    body: `
+      <div class="warning info">${icon('key-round', 15)}<span>Khusus pemilik Serambi. Kunci ditandatangani dengan berkas kunci privat <code>serambi-penerbit-lisensi.pem</code>. Berkas itu hanya dibaca saat menerbitkan dan tidak disalin ke mana pun.</span></div>
+      <div class="form-grid">
+        <div class="field"><label>Paket</label><select class="input" data-f="plan"><option value="small">SMALPreneur (5–10 pengguna)</option><option value="medium">MediumPreneur (10–30 pengguna)</option></select></div>
+        <div class="field"><label>Jumlah pengguna</label><input class="input" type="number" min="1" max="30" data-f="seats" value="10"></div>
+        <div class="field"><label>Nama usaha/pelanggan</label><input class="input" data-f="name" maxlength="80"></div>
+        <div class="field"><label>Email pelanggan</label><input class="input" type="email" data-f="email" maxlength="120"></div>
+        <div class="field"><label>Masa berlaku</label><select class="input" data-f="months"><option value="1">1 bulan</option><option value="3">3 bulan</option><option value="6">6 bulan</option><option value="12" selected>12 bulan</option><option value="0">Tanpa batas waktu</option></select></div>
+      </div>
+      <div data-out></div>
+      ${issued.length ? `<details class="consent-hist"><summary>Lisensi yang pernah diterbitkan (${issued.length}) ${icon('chevron-down', 14)}</summary><ul>${issued.slice(0, 50).map((l, i) => `<li>${esc(fmtDate(l.iat))} · ${esc(S.plans[l.plan] ? S.plans[l.plan].name : l.plan)} · ${l.seats} pengguna · ${esc(l.name)}${l.email ? ' · ' + esc(l.email) : ''} · ${l.exp ? 's.d. ' + esc(fmtDate(l.exp)) : 'tanpa batas'} <button class="link" data-copy-old="${i}">salin</button></li>`).join('')}</ul></details>` : ''}`,
+    foot: `<button class="btn ghost" data-pick>Ganti berkas kunci…</button><span style="flex:1"></span><button class="btn ghost" data-no>Tutup</button><button class="btn primary" data-yes>${icon('badge-check', 15)}Terbitkan</button>`
+  });
+  const plan = m.el.querySelector('[data-f="plan"]'), seats = m.el.querySelector('[data-f="seats"]');
+  plan.onchange = () => { const p = S.plans[plan.value]; seats.max = p.seatsMax; seats.min = 1; seats.value = p.seatsMax; };
+  const issue = async (pickKey) => {
+    const v = Object.fromEntries([...m.el.querySelectorAll('[data-f]')].map(i => [i.dataset.f, i.value]));
+    if (!v.name.trim()) { toast('Isi nama pelanggan', { kind: 'err' }); return; }
+    const r = await api.issueLicense({ plan: v.plan, seats: Number(v.seats), name: v.name, email: v.email, months: Number(v.months), pickKey });
+    if (!r.ok) { if (r.error) toast(r.error, { kind: 'err', ms: 7000 }); return; }
+    const mail = `mailto:${encodeURIComponent(v.email)}?subject=${encodeURIComponent('Kunci lisensi Serambi ' + S.plans[v.plan].name)}&body=${encodeURIComponent(`Halo ${v.name},
+
+Berikut kunci lisensi Serambi ${S.plans[v.plan].name} untuk ${r.payload.seats} pengguna${r.payload.exp ? ', berlaku sampai ' + fmtDateLong(r.payload.exp) : ''}:
+
+${r.key}
+
+Cara mengaktifkan: buka Serambi → Pengaturan → Paket & lisensi → Aktifkan lisensi, lalu tempel kunci di atas.
+
+Salam,
+${S.owner.name}`)}`;
+    m.el.querySelector('[data-out]').innerHTML = `<div class="field"><label>Kunci lisensi (${esc(r.keyFile)})</label><pre class="code selectable">${esc(r.key)}</pre>
+      <div class="row-btns"><button class="btn sm" data-copy-key>${icon('copy', 14)}Salin kunci</button>${v.email ? `<button class="btn sm" data-mail-key>${icon('mail', 14)}Kirim lewat email</button>` : ''}</div></div>`;
+    m.el.querySelector('[data-copy-key]').onclick = async () => { await api.copyText(r.key); toast('Kunci lisensi disalin'); };
+    const mk = m.el.querySelector('[data-mail-key]'); if (mk) mk.onclick = () => api.openExternal(mail);
+  };
+  m.el.querySelector('[data-yes]').onclick = () => issue(false);
+  m.el.querySelector('[data-pick]').onclick = () => issue(true);
+  m.el.querySelector('[data-no]').onclick = () => m.close();
+  m.el.addEventListener('click', async (e) => { const b = e.target.closest('[data-copy-old]'); if (b) { await api.copyText(issued[Number(b.dataset.copyOld)].key); toast('Kunci disalin'); } });
 }
 
 function onChange(e) {
   const t = e.target;
   if (t.dataset.setting) api.setSettings({ [t.dataset.setting]: t.checked });
+  if (t.matches('[data-username]')) { api.setSettings({ userName: t.value }); toast('Nama disimpan'); }
 }
 
 export default {

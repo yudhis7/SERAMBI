@@ -13,7 +13,21 @@ const names = [
   'calendar', 'copy-plus', 'download', 'upload', 'bot', 'search', 'info', 'clipboard-copy',
   'grip-vertical', 'zoom-in', 'zoom-out', 'circle-check-big', 'hourglass', 'bookmark-plus',
   'message-circle', 'bookmark', 'bookmark-check', 'store', 'link', 'shopping-bag', 'circle-arrow-down',
-  'mail', 'house-plus', 'refresh-cw', 'badge-info', 'copyright'
+  'mail', 'house-plus', 'refresh-cw', 'badge-info', 'copyright',
+  // v1.2: plans, team, local growth, use cases, Trust Center
+  'trending-up', 'lightbulb', 'users', 'shield-check', 'lock', 'lock-open', 'key-round', 'megaphone',
+  'star', 'map-pin', 'qr-code', 'printer', 'user-plus', 'file-down', 'gauge', 'zap', 'refresh-ccw',
+  'badge-check', 'file-lock', 'timer', 'user-x', 'eye', 'eye-off', 'shield-alert', 'scale',
+  'scroll-text', 'history', 'building-2', 'crown', 'target', 'chart-column', 'list-checks', 'phone',
+  'globe', 'check-check', 'circle-x', 'triangle-alert', 'filter', 'tag', 'wallet',
+  'mouse-pointer-click', 'calculator', 'book-open', 'briefcase', 'utensils', 'scissors',
+  'stethoscope', 'wrench', 'cake-slice', 'shirt', 'car', 'coffee', 'folder-open', 'folder-sync',
+  'user-cog', 'message-square', 'heart-handshake', 'arrow-up-right', 'square-check', 'square',
+  'circle-dot', 'database', 'hard-drive', 'fingerprint', 'cloud', 'chevron-down', 'chevron-up',
+  'link-2', 'messages-square', 'repeat', 'calendar-clock', 'clipboard-list', 'flag', 'bell-ring',
+  'smartphone', 'laptop', 'pen-line', 'minus', 'circle-help', 'sprout', 'rocket', 'handshake',
+  'washing-machine', 'clipboard-check', 'file-check', 'sparkle', 'user-check', 'user-round',
+  'log-in', 'layout-grid', 'copy-check'
 ];
 
 const dir = path.join(__dirname, '..', 'node_modules', 'lucide-static', 'icons');

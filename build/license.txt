@@ -1,4 +1,4 @@
-﻿SERAMBI — LISENSI PENGGUNAAN
+SERAMBI — LISENSI PENGGUNAAN
 Hak cipta © 2026 Yudhistira (yudhie7@gmail.com). Seluruh hak dilindungi.
 
 Serambi, termasuk kode sumber, desain antarmuka, nama, logo, dan dokumentasinya
@@ -23,11 +23,25 @@ Serambi, termasuk kode sumber, desain antarmuka, nama, logo, dan dokumentasinya
    pada ketentuan masing-masing platform. Serambi tidak berafiliasi dengan
    platform-platform tersebut.
 
-4. Komponen pihak ketiga
+4. Paket dan kunci lisensi
+   SOLOPreneur boleh dipakai gratis. Paket SMALPreneur dan MediumPreneur hanya
+   boleh dipakai dengan kunci lisensi sah yang diterbitkan Yudhistira, oleh
+   pemegang yang namanya tercantum, untuk jumlah pengguna dan masa berlaku yang
+   tertera. Kamu tidak boleh membagikan, menjual ulang, memalsukan kunci
+   lisensi, atau mengakali pemeriksaan lisensi.
+
+5. Data pribadi pelanggan
+   Data yang kamu catat di Serambi tersimpan di komputermu dan di folder bersama
+   pilihanmu, bukan di server Yudhistira. Untuk data pribadi pelangganmu, kamu
+   (usahamu) adalah pengendali data menurut UU No. 27 Tahun 2022 tentang
+   Pelindungan Data Pribadi. Fitur Pusat Kepercayaan adalah alat bantu kerja,
+   bukan nasihat hukum.
+
+6. Komponen pihak ketiga
    Perangkat Lunak memuat komponen sumber terbuka yang tetap tunduk pada
    lisensinya sendiri. Daftarnya ada di THIRD_PARTY_NOTICES.md.
 
-5. Tanpa jaminan
+7. Tanpa jaminan
    Perangkat Lunak disediakan "sebagaimana adanya", tanpa jaminan apa pun.
    Yudhistira tidak bertanggung jawab atas kerugian yang timbul dari
    pemakaiannya, sejauh diizinkan hukum yang berlaku.
@@ -42,6 +56,11 @@ Copyright © 2026 Yudhistira (yudhie7@gmail.com). All rights reserved.
 You may install and use Serambi on computers you own, for personal or business
 use. You may not copy, modify, redistribute, sell, sublicense, or create
 derivative works of Serambi or its source code, or remove its copyright
-notices, without written permission from Yudhistira. Third-party open-source
+notices, without written permission from Yudhistira. SOLOPreneur is free;
+SMALPreneur and MediumPreneur require a valid licence key issued by Yudhistira
+for the named holder, seat count and term, and licence keys may not be shared,
+resold, forged or circumvented. You are the data controller for the personal
+data of your customers that you record in Serambi; the Trust Center is a
+working tool, not legal advice. Third-party open-source
 components remain under their own licenses (see THIRD_PARTY_NOTICES.md).
 Serambi is provided "as is", without warranty of any kind.

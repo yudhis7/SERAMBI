@@ -2,14 +2,22 @@
 //
 // Serambi — interface shell: sidebar, routing, account web views and the posting helper.
 import { icon } from './icons.js';
-import { $, $$, esc, toast, openModal, confirmDialog, promptDialog, showMenu, debounce, snippet } from './util.js';
-import { S, api, on, go, emit, account, platformOf, tile, tileForPlatform, mediaTag, targetChip, hasBot, modKey, PLATFORM_DESC, KIND_LABEL, kindOf, orderedAccounts, homeOf, updateLine } from './ctx.js';
+import { $, $$, esc, toast, openModal, confirmDialog, promptDialog, showMenu, closeMenu, debounce, snippet } from './util.js';
+import { S, api, on, go, emit, account, platformOf, tile, tileForPlatform, mediaTag, targetChip, hasBot, modKey, PLATFORM_DESC, KIND_LABEL, kindOf, orderedAccounts, homeOf, updateLine, perm, inTeam, normPhone, waMe } from './ctx.js';
 import HomeView from './views/home.js';
 import ComposeView from './views/compose.js';
 import ScheduleView from './views/schedule.js';
-import SettingsView from './views/settings.js';
+import SettingsView, { openLicenseIssuer } from './views/settings.js';
+import GrowthView from './views/growth.js';
+import CustomersView from './views/customers.js';
+import TeamView from './views/team.js';
+import UseCasesView from './views/usecases.js';
+import TrustView from './views/trust.js';
 
-const VIEWS = { home: HomeView, compose: ComposeView, schedule: ScheduleView, settings: SettingsView };
+const VIEWS = {
+  home: HomeView, compose: ComposeView, schedule: ScheduleView, settings: SettingsView,
+  growth: GrowthView, customers: CustomersView, team: TeamView, usecases: UseCasesView, trust: TrustView
+};
 let currentView = null;
 
 const BRAND_MARK = `<svg class="brand-mark" viewBox="250 290 524 560" aria-hidden="true"><path d="M282 486 L512 316 L742 486" fill="none" stroke="#fff" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/><path d="M400 548 H624 A72 72 0 0 1 696 620 V686 A72 72 0 0 1 624 758 H468 L392 818 L404 754 A72 72 0 0 1 328 686 V620 A72 72 0 0 1 400 548 Z" fill="#F2B33D"/></svg>`;
@@ -20,7 +28,11 @@ const BRAND_MARK = `<svg class="brand-mark" viewBox="250 290 524 560" aria-hidde
 function renderSidebar() {
   const { accounts, posts, settings } = S.state;
   const r = S.route;
-  const due = posts.filter(p => p.status === 'due').length;
+  const due = posts.filter(p => p.status === 'due').length + (perm('post.approve') ? posts.filter(p => p.status === 'review').length : 0);
+  const myTasks = S.state.tasks.filter(t => t.status === 'open' && (!inTeam() || !t.assigneeId || t.assigneeId === S.state.me.id)).length;
+  const unreplied = S.state.reviews.filter(x => !x.reply).length;
+  const trustOpen = S.state.dsr.filter(x => !['closed', 'rejected'].includes(x.status)).length + S.state.incidents.filter(x => x.status !== 'closed').length;
+  const pl = S.state.plan || {};
   const collapsed = !!settings.sidebarCollapsed;
   document.body.classList.toggle('collapsed', collapsed);
 
@@ -58,12 +70,16 @@ function renderSidebar() {
     <div class="sb-top">
       <div class="brand">${BRAND_MARK}<span class="brand-text">Serambi</span></div>
       <span class="grow"></span>
+      ${S.state.security && S.state.security.lock ? `<button class="sb-icon-btn collapse-btn" data-lock title="Kunci Serambi (${modKey()}+Shift+L)">${icon('lock', 17)}</button>` : ''}
       <button class="sb-icon-btn collapse-btn" data-collapse title="Ciutkan panel">${icon('panel-left-close', 18)}</button>
     </div>
     <div class="sb-scroll">
-      ${nav('home', 'house', 'Beranda')}
-      ${nav('compose', 'square-pen', 'Tulis postingan', '', `Tulis postingan (${modKey()}+N)`)}
+      ${nav('home', 'house', 'Beranda', myTasks ? `<span class="sb-count soft">${myTasks}</span>` : '', myTasks ? `Beranda · ${myTasks} tugas` : 'Beranda')}
+      ${perm('post.write') ? nav('compose', 'square-pen', 'Tulis postingan', '', `Tulis postingan (${modKey()}+N)`) : ''}
       ${nav('schedule', 'calendar-days', 'Jadwal', due ? `<span class="sb-count">${due}</span>` : '')}
+      ${nav('growth', 'trending-up', 'Tumbuh lokal', unreplied ? `<span class="sb-count soft">${unreplied}</span>` : '', unreplied ? `Tumbuh lokal · ${unreplied} ulasan belum dibalas` : 'Tumbuh lokal')}
+      ${nav('customers', 'heart-handshake', 'Pelanggan')}
+      ${nav('team', 'users', 'Tim', inTeam() ? '' : '<span class="sb-tag">Tim</span>', inTeam() ? `Tim · ${S.state.workspace.name}` : 'Kerja tim')}
       ${accounts.length ? section('Media sosial', social, 'social') : ''}
       ${shops.length ? section('Toko online', shops, 'shop') : ''}
       ${!accounts.length ? '<div class="sb-section"><span>Akun</span></div>' : ''}
@@ -73,6 +89,10 @@ function renderSidebar() {
     </div>
     <div class="sb-bottom">
       ${updatePill}
+      <button class="sb-item sb-plan ${pl.id || ''}" data-go-plan title="Paket ${esc(pl.name || '')}${pl.source === 'trial' ? ` · uji coba ${pl.daysLeft} hari lagi` : ''}">
+        ${icon('crown', 19)}<span class="label">${esc(pl.name || '')}${pl.source === 'trial' ? ` <span class="sb-sub">uji coba · ${pl.daysLeft} hari</span>` : ''}</span></button>
+      ${nav('usecases', 'lightbulb', 'Contoh penggunaan')}
+      ${nav('trust', 'shield-check', 'Pusat Kepercayaan', trustOpen ? `<span class="sb-count">${trustOpen}</span>` : '')}
       ${nav('settings', 'settings', 'Pengaturan')}
       ${collapsed ? `<button class="sb-item" data-collapse title="Lebarkan panel">${icon('panel-left-open', 19)}</button>` : ''}
     </div>`;
@@ -91,6 +111,8 @@ function bindSidebar() {
       else api.downloadUpdate();
     }
     else if ('collapse' in b.dataset) api.setSettings({ sidebarCollapsed: !S.state.settings.sidebarCollapsed });
+    else if ('lock' in b.dataset) api.lock();
+    else if ('goPlan' in b.dataset) go({ name: 'settings', section: 'plan' });
   });
   sb.addEventListener('contextmenu', (e) => {
     const b = e.target.closest('[data-acct]');
@@ -695,7 +717,10 @@ function navigate(route) {
 
 function handleState(next) {
   const prevIds = new Set(S.state.accounts.map(a => a.id));
+  const wasLocked = S.state.locked;
   S.state = next;
+  renderLock();
+  if (wasLocked && !next.locked && S.route.name !== 'account') { navigate(S.route); stateListeners.forEach(fn => fn()); return; }
   for (const id of prevIds) if (!next.accounts.find(a => a.id === id)) removeWebview(id);
   renderSidebar();
   if (S.route.name === 'account') {
@@ -712,8 +737,9 @@ function handleState(next) {
 function handleCommand(cmd) {
   const accs = orderedAccounts();
   switch (cmd.type) {
-    case 'go': return go({ name: cmd.route, section: cmd.section });
+    case 'go': return go({ name: cmd.route, section: cmd.section, tab: cmd.tab });
     case 'about': return openAbout();
+    case 'license-issuer': return openLicenseIssuer();
     case 'account': if (accs[cmd.index]) go({ name: 'account', id: accs[cmd.index].id }); return;
     case 'next-account':
     case 'prev-account': {
@@ -747,14 +773,15 @@ function openAbout() {
           <span class="about-ver">Versi ${esc(S.version)}</span>
         </div>
       </div>
-      <p>Satu aplikasi untuk mengelola media sosial dan toko online: Instagram, Facebook, X, TikTok, WhatsApp, Telegram, Tokopedia, dan Shopee.</p>
+      <p>Satu aplikasi untuk mengelola media sosial dan toko online (Instagram, Facebook, X, TikTok, WhatsApp, Telegram, Tokopedia, Shopee), tumbuh di pencarian lokal, mengelola ulasan dan iklan, bekerja bersama tim, dan menjaga data pelanggan.</p>
+      <p class="hint">Paket: ${esc(S.state.plan.name || '')}${S.state.plan.source === 'license' && S.state.plan.license ? ' · lisensi untuk ' + esc(S.state.plan.license.name) : S.state.plan.source === 'trial' ? ' · uji coba' : ''}</p>
       <div class="about-owner">
         <span>${icon('copyright', 16)}</span>
         <div><b>${esc(S.owner.copyright)}</b>
           <span>Pemilik dan pengembang: ${esc(S.owner.name)} · <button class="link" data-mail>${esc(S.owner.email)}</button></span></div>
       </div>
       <p class="hint" data-about-update>${esc(updateLine(S.update))}</p>
-      <p class="hint">Dibangun dengan Electron (MIT), ikon Lucide (ISC), dan huruf Plus Jakarta Sans (SIL Open Font License 1.1).</p>`,
+      <p class="hint">Dibangun dengan Electron (MIT), node-qrcode (MIT), ikon Lucide (ISC), dan huruf Plus Jakarta Sans (SIL Open Font License 1.1).</p>`,
     foot: `<button class="btn ghost" data-check>${icon('refresh-cw', 15)}Periksa pembaruan</button><span style="flex:1"></span><button class="btn primary" data-ok>Tutup</button>`
   });
   m.el.querySelector('[data-mail]').onclick = () => api.openMail();
@@ -776,7 +803,115 @@ function handleUpdate(u) {
   updateListeners.forEach(fn => fn());
 }
 
+// =====================================================================
+// App lock & storage problems
+// =====================================================================
+let lockWait = 0;
+function renderLock() {
+  const root = $('#lock-root');
+  const st = S.state;
+  if (st.storeBlocked) {
+    document.body.classList.add('locked');
+    if (root.dataset.mode === 'blocked') return;
+    root.dataset.mode = 'blocked';
+    root.innerHTML = `<div class="lock-screen"><div class="lock-card">
+      <div class="about-mark">${BRAND_MARK}</div>
+      <h2>Data Serambi terkunci di komputer ini</h2>
+      <p>Data Serambi dienkripsi dengan kunci sistem operasi, tetapi kuncinya tidak bisa dibuka sekarang.${S.os === 'darwin' ? ' Di Mac, pilih <b>Coba lagi</b> lalu klik <b>Selalu Izinkan</b> saat Keychain meminta izin (masukkan kata sandi login Mac).' : ' Ini bisa terjadi bila data dipindahkan dari komputer atau akun pengguna lain.'}</p>
+      <div class="row-btns" style="justify-content:center"><button class="btn primary" data-store-retry>${icon('refresh-cw', 16)}Coba lagi</button></div>
+      <button class="link" data-store-aside>Mulai dengan data kosong (data lama disimpan sebagai berkas terpisah)</button>
+    </div></div>`;
+    root.querySelector('[data-store-retry]').onclick = async () => { const r = await api.retryStore(); if (!r || !r.ok) toast('Masih belum bisa dibuka', { kind: 'err' }); };
+    root.querySelector('[data-store-aside]').onclick = async () => {
+      if (await confirmDialog({ title: 'Mulai dengan data kosong?', message: 'Berkas data lama tidak dihapus; disimpan di folder data Serambi dengan akhiran “.terkunci”. Kamu bisa memulihkan dari cadangan setelah ini.', confirm: 'Mulai baru', danger: true })) api.setAsideStore();
+    };
+    return;
+  }
+  if (!st.locked) {
+    if (root.dataset.mode) { root.innerHTML = ''; delete root.dataset.mode; document.body.classList.remove('locked'); }
+    return;
+  }
+  document.body.classList.add('locked');
+  closeMenu();
+  if (root.dataset.mode === 'lock') return;
+  root.dataset.mode = 'lock';
+  root.innerHTML = `<div class="lock-screen"><form class="lock-card" data-lock-form>
+    <div class="about-mark">${BRAND_MARK}</div>
+    <h2>Serambi terkunci</h2>
+    <p>${inTeam() ? esc(S.state.me.name) + ' · ' + esc(S.state.workspace.name) : 'Masukkan PIN untuk melanjutkan.'}</p>
+    <input class="input lock-pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="64" data-pin aria-label="PIN" autofocus>
+    <p class="error-text" data-lock-err></p>
+    <button class="btn primary lg block" type="submit">${icon('lock-open', 17)}Buka</button>
+    <button class="link" type="button" data-forgot>Lupa PIN?</button>
+  </form></div>`;
+  const form = root.querySelector('[data-lock-form]');
+  const input = root.querySelector('[data-pin]');
+  setTimeout(() => input.focus(), 50);
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    if (Date.now() < lockWait) return;
+    const r = await api.unlock(input.value);
+    if (r.ok) { input.value = ''; return; }
+    input.value = '';
+    const err = root.querySelector('[data-lock-err]');
+    err.textContent = r.error + (r.waitMs ? ` Coba lagi dalam ${Math.ceil(r.waitMs / 1000)} detik.` : '');
+    if (r.waitMs) lockWait = Date.now() + r.waitMs;
+    form.classList.remove('shake'); void form.offsetWidth; form.classList.add('shake');
+  };
+  root.querySelector('[data-forgot]').onclick = async () => {
+    const ok = await confirmDialog({ title: 'Reset Serambi tanpa PIN?', message: `Demi keamanan, semua login akun di Serambi akan dikeluarkan dan ${inTeam() ? 'komputer ini keluar dari ruang kerja tim (data tim di komputer ini dihapus)' : 'data pelanggan, permintaan subjek data, dan insiden di komputer ini dihapus'}. Postingan dan pengaturan tetap ada. Kamu bisa memulihkan dari cadangan terenkripsi.`, confirm: 'Reset', danger: true });
+    if (ok) { await api.resetPin(); toast('PIN direset. Buat PIN baru di Pusat Kepercayaan.'); }
+  };
+}
+
+// =====================================================================
+// WhatsApp: open a chat with a prepared message
+// =====================================================================
+function openWhatsApp({ phone, text }) {
+  const p = normPhone(phone);
+  if (!p) { toast('Nomor WhatsApp tidak valid', { kind: 'err' }); return; }
+  const wa = orderedAccounts().find(a => a.platform === 'whatsapp' && !a.muted) || orderedAccounts().find(a => a.platform === 'whatsapp');
+  if (!wa) { api.openExternal(waMe(p, text)); return; }
+  const url = `https://web.whatsapp.com/send?phone=${p}${text ? '&text=' + encodeURIComponent(text) : ''}`;
+  go({ name: 'account', id: wa.id });
+  const rec = ensureWebview(wa);
+  const load = () => { try { rec.el.loadURL(url); } catch (_) {} };
+  if (rec.ready) load(); else rec.el.addEventListener('dom-ready', load, { once: true });
+  toast(text ? 'Pesan sudah diisi. Periksa, lalu tekan kirim di WhatsApp.' : 'Membuka chat WhatsApp', { kind: 'info', ms: 5000 });
+}
+
+// =====================================================================
+// What's new in 1.2
+// =====================================================================
+function whatsNew() {
+  if (S.state.settings.seenVersion === '1.2') return;
+  api.setSettings({ seenVersion: '1.2' });
+  if (!S.state.accounts.length && !S.state.posts.length) return; // brand-new users see the welcome screen instead
+  const m = openModal({
+    title: 'Baru di Serambi 1.2',
+    wide: true,
+    body: `
+      <div class="whatsnew">
+        <div>${icon('crown', 20)}<b>3 paket</b><span>SOLOPreneur (gratis), SMALPreneur (tim 5–10), MediumPreneur (tim 10–30). Coba fitur tim gratis ${S.trialDays} hari.</span></div>
+        <div>${icon('trending-up', 20)}<b>Tumbuh lokal</b><span>Profil Bisnis Google, SEO lokal, iklan lokal, kotak ulasan, dan otomatisasi pemasaran harian.</span></div>
+        <div>${icon('users', 20)}<b>Kerja tim terenkripsi</b><span>Ruang kerja di Google Drive/OneDrive/Dropbox, peran, persetujuan postingan, komentar, dan tugas.</span></div>
+        <div>${icon('lightbulb', 20)}<b>Contoh penggunaan</b><span>9 contoh usaha lokal yang bisa diikuti atau diterapkan dengan satu klik.</span></div>
+        <div>${icon('shield-check', 20)}<b>Pusat Kepercayaan</b><span>Kunci PIN, enkripsi, persetujuan pelanggan, dan alat kepatuhan UU Pelindungan Data Pribadi.</span></div>
+      </div>`,
+    foot: `<button class="btn ghost" data-uc>Lihat contoh</button><button class="btn" data-trust>Pusat Kepercayaan</button><button class="btn primary" data-growth>${icon('trending-up', 15)}Mulai tumbuh lokal</button>`
+  });
+  m.el.querySelector('[data-uc]').onclick = () => { m.close(); go({ name: 'usecases' }); };
+  m.el.querySelector('[data-trust]').onclick = () => { m.close(); go({ name: 'trust' }); };
+  m.el.querySelector('[data-growth]').onclick = () => { m.close(); go({ name: 'growth' }); };
+}
+
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = e.reason && e.reason.message;
+  if (msg) { toast(msg, { kind: 'err', ms: 6000 }); e.preventDefault(); }
+});
+
 on('go', navigate);
+on('wa', openWhatsApp);
 on('assist', openAssist);
 on('add-account', (preset) => openAddAccount(preset, preset ? null : undefined));
 on('add-account-kind', (kind) => openAddAccount(null, kind));
@@ -793,12 +928,18 @@ async function boot() {
   S.mediaBase = init.mediaBase;
   S.owner = init.owner;
   S.update = init.update;
+  Object.assign(S, {
+    plans: init.plans, roles: init.roles, moments: init.moments, momentKinds: init.momentKinds, legalBases: init.legalBases,
+    dsrTypes: init.dsrTypes, responseHours: init.responseHours, consentPurposes: init.consentPurposes, trialDays: init.trialDays
+  });
   document.body.classList.add('os-' + S.os);
   bindSidebar();
   api.onState(handleState);
   api.onCommand(handleCommand);
   api.onUpdate(handleUpdate);
   navigate({ name: 'home' });
+  renderLock();
+  if (!S.state.locked && !S.state.storeBlocked) setTimeout(whatsNew, 800);
 
   // Load every account in the background so chats, notifications and badges stay live.
   if (S.state.settings.preloadAccounts !== false) {

@@ -16,3 +16,7 @@ MIT License. Copyright (c) Electron contributors, Copyright (c) 2013-2020 GitHub
 
 ## electron-updater
 MIT License. Copyright (c) 2015 Loopline Systems and electron-builder contributors.
+
+## node-qrcode (qrcode)
+MIT License. Copyright (c) 2012 Ryan Day. Used to draw QR codes for review cards and campaign links.
+Its dependencies dijkstrajs (MIT), pngjs (MIT) and yargs (MIT) are distributed with it under their own MIT licenses.

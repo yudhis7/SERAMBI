@@ -2,3 +2,7 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Kunci privat penerbit lisensi: JANGAN pernah di-commit
+*.pem
+keys/
