@@ -1,43 +1,90 @@
 # Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
 #
-# Membuat installer Windows dan Mac, lalu menerbitkannya sebagai GitHub Release.
-# Aplikasi yang sudah terpasang mengambil versi baru dari Release ini.
-# Cara pakai: naikkan "version" di package.json, commit, lalu buat tag yang sama, misalnya:
-#   git tag v1.1.0 && git push origin v1.1.0
+# Rilis otomatis Serambi.
+# Setiap push ke branch main: kalau versi di package.json belum punya Release,
+# workflow ini membangun installer Windows dan Mac lalu menerbitkan Release vX.Y.Z.
+# Aplikasi yang sudah terpasang mengambil pembaruan dari Release terbaru.
+#
+# Versi lama di daftar RIWAYAT juga diterbitkan (sekali saja) supaya semua versi
+# Serambi tetap bisa dilihat dan diunduh di halaman Releases.
+#
+# Cara merilis versi baru: naikkan "version" di package.json, lalu push ke main.
 
 name: Rilis Serambi
 
 on:
   push:
-    tags: ['v*']
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: rilis-serambi
+  cancel-in-progress: false
+
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      todo: ${{ steps.plan.outputs.todo }}
+      any: ${{ steps.plan.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Riwayat versi: versi, commit, dan apakah ditandai sebagai versi terbaru.
+          RIWAYAT: '[{"version":"1.0.0","sha":"d986125b2706196c39b5fe4f5e30599a8eacec47","latest":false}]'
+        run: |
+          current=$(node -p "require('./package.json').version")
+          list=$(jq -c --arg v "$current" --arg s "$GITHUB_SHA" \
+            '[.[] | select(.version != $v)] + [{version:$v, sha:$s, latest:true}]' <<< "$RIWAYAT")
+          todo='[]'
+          for row in $(jq -c '.[]' <<< "$list"); do
+            v=$(jq -r .version <<< "$row")
+            if gh release view "v$v" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+              echo "v$v sudah punya Release, dilewati."
+            else
+              echo "v$v akan diterbitkan."
+              todo=$(jq -c --argjson r "$row" '. + [$r]' <<< "$todo")
+            fi
+          done
+          echo "todo=$todo" >> "$GITHUB_OUTPUT"
+          [ "$todo" != "[]" ] && echo "any=true" >> "$GITHUB_OUTPUT" || echo "any=false" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: plan
+    if: needs.plan.outputs.any == 'true'
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            script: dist:win
-          - os: macos-latest
-            script: dist:mac
+        rel: ${{ fromJSON(needs.plan.outputs.todo) }}
+        os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.rel.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run ${{ matrix.script }}
+      - name: Bangun installer
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            npx electron-builder --win --x64 --publish never
+          else
+            npx electron-builder --mac --x64 --arm64 --publish never
+          fi
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - uses: actions/upload-artifact@v4
         with:
-          name: serambi-${{ matrix.os }}
+          name: v${{ matrix.rel.version }}-${{ matrix.os }}
           path: |
             dist/*.exe
             dist/*.dmg
@@ -47,16 +94,30 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [plan, build]
+    if: needs.plan.outputs.any == 'true'
+    strategy:
+      max-parallel: 1
+      matrix:
+        rel: ${{ fromJSON(needs.plan.outputs.todo) }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
+          pattern: v${{ matrix.rel.version }}-*
           path: out
           merge-multiple: true
+      - name: Siapkan catatan rilis
+        run: |
+          f=".github/release-notes/v${{ matrix.rel.version }}.md"
+          if [ -f "$f" ]; then cp "$f" notes.md; else echo "Serambi ${{ matrix.rel.version }}" > notes.md; fi
       - uses: softprops/action-gh-release@v2
         with:
-          name: Serambi ${{ github.ref_name }}
+          tag_name: v${{ matrix.rel.version }}
+          target_commitish: ${{ matrix.rel.sha }}
+          name: Serambi ${{ matrix.rel.version }}
+          body_path: notes.md
           files: out/*
+          make_latest: ${{ matrix.rel.latest }}
           fail_on_unmatched_files: true

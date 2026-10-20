@@ -46,15 +46,13 @@ Pengguna versi 1.0.0 perlu memasang 1.1.0 secara manual sekali. Mulai 1.1.0, pem
 1. Buat akun GitHub dengan username **yudhis7** (atau pakai yang sudah ada), lalu buat repositori **publik** bernama **serambi**.
    Kalau username atau nama repo berbeda, ubah `UPDATE_OWNER` / `UPDATE_REPO` di `src/main/config.js` **dan** `build.publish` di `package.json`, lalu buat ulang installer.
 2. Unggah seluruh kode sumber ke repositori itu.
-3. Terbitkan versi pertama dengan salah satu cara:
-   - **Otomatis (disarankan):** buat tag `v1.1.0` (`git tag v1.1.0 && git push origin v1.1.0`). GitHub Actions membuat installer Windows dan Mac lalu menerbitkan Release.
-   - **Manual:** di GitHub, buka **Releases → Draft a new release**, beri tag `v1.1.0`, unggah `Serambi-Setup-1.1.0.exe`, `Serambi-Setup-1.1.0.exe.blockmap`, `latest.yml`, dan kedua zip Mac, lalu klik **Publish release**.
+3. Push kode ke branch `main`. Workflow GitHub Actions **Rilis Serambi** otomatis membangun installer Windows dan Mac, lalu menerbitkan Release sesuai versi di `package.json`. Riwayat versi lama (1.0.0) ikut diterbitkan sekali.
 
 ### Menerbitkan versi berikutnya
 
-1. Naikkan `"version"` di `package.json`, misalnya ke `1.2.0`.
-2. Commit, lalu buat tag yang sama: `git tag v1.2.0 && git push origin v1.2.0`.
-3. Setelah Release terbit, semua Serambi yang terpasang akan menemukannya sendiri.
+1. Naikkan `"version"` di `package.json`, misalnya ke `1.2.0`. Tulis catatan rilis di `.github/release-notes/v1.2.0.md` (opsional).
+2. Commit dan push ke `main`.
+3. Sekitar 10–15 menit kemudian Release `v1.2.0` terbit, dan semua Serambi yang terpasang akan menemukannya sendiri.
 
 ## Mulai memakai
 
