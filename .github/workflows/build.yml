@@ -97,6 +97,7 @@ jobs:
     needs: [plan, build]
     if: needs.plan.outputs.any == 'true'
     strategy:
+      fail-fast: false
       max-parallel: 1
       matrix:
         rel: ${{ fromJSON(needs.plan.outputs.todo) }}
@@ -112,6 +113,20 @@ jobs:
         run: |
           f=".github/release-notes/v${{ matrix.rel.version }}.md"
           if [ -f "$f" ]; then cp "$f" notes.md; else echo "Serambi ${{ matrix.rel.version }}" > notes.md; fi
+      - name: Buat tag v${{ matrix.rel.version }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ matrix.rel.version }}"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" > /dev/null 2>&1; then
+            echo "Tag $tag sudah ada."
+            exit 0
+          fi
+          if ! out=$(gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$tag" -f sha="${{ matrix.rel.sha }}" 2>&1); then
+            echo "::error title=Tag $tag gagal dibuat::$out"
+            exit 1
+          fi
+          echo "Tag $tag dibuat."
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ matrix.rel.version }}
