@@ -1,7 +1,9 @@
+// Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
+//
 // Beranda — today at a glance.
 import { icon } from '../icons.js';
 import { esc, fmtTime, fmtDayLong, relDay, greeting, startOfDay, addDays, snippet } from '../util.js';
-import { S, go, emit, account, platformOf, tile, tileForPlatform, tilesFor, statusChip, postTime, hasBot, PLATFORM_DESC } from '../ctx.js';
+import { S, go, emit, account, platformOf, tile, tileForPlatform, tilesFor, statusChip, postTime, hasBot, PLATFORM_DESC, KIND_LABEL, kindOf } from '../ctx.js';
 
 let root, timer;
 
@@ -60,19 +62,21 @@ function render() {
   if (!accounts.length) {
     root.innerHTML = `
       <div class="page"><div class="welcome">
-        <h2>Semua akun media sosialmu, di satu tempat</h2>
-        <p>Tambahkan akun pertamamu. Kamu akan masuk di halaman resmi platformnya, lalu chat, notifikasi, dan jadwal postingan bisa diurus dari sini.</p>
-        <div class="platform-grid">
-          ${Object.values(S.platforms).map(p => `
-            <button class="platform-card" data-quick="${p.id}" style="--c:${p.color}">
-              ${tileForPlatform(p.id, 'lg')}
-              <div><b>${esc(p.name)}</b><span>${esc(PLATFORM_DESC[p.id] || '')}</span></div>
-            </button>`).join('')}
-        </div>
+        <h2>Media sosial dan toko onlinemu, di satu tempat</h2>
+        <p>Tambahkan akun pertamamu. Kamu akan masuk di halaman resmi platformnya, lalu chat, notifikasi, jadwal postingan, dan promosi toko bisa diurus dari sini.</p>
+        ${['social', 'shop'].map(kind => `
+          <h3 class="welcome-group">${KIND_LABEL[kind]}</h3>
+          <div class="platform-grid ${kind}">
+            ${Object.values(S.platforms).filter(p => (p.kind || 'social') === kind).map(p => `
+              <button class="platform-card" data-quick="${p.id}" style="--c:${p.color}">
+                ${tileForPlatform(p.id, 'lg')}
+                <div><b>${esc(p.name)}</b><span>${esc(PLATFORM_DESC[p.id] || '')}</span></div>
+              </button>`).join('')}
+          </div>`).join('')}
         <div class="welcome-steps">
           <div><b>Masuk sekali</b>Login tiap akun tersimpan. Bisa beberapa akun di platform yang sama.</div>
-          <div><b>Tulis sekali, kirim ke banyak akun</b>Susun postingan, pilih akun dan waktunya.</div>
-          <div><b>Diingatkan tepat waktu</b>Telegram bisa terkirim otomatis lewat bot. Akun lain cukup tempel.</div>
+          <div><b>Tulis sekali, kirim ke banyak akun</b>Susun postingan atau promosi, pilih akun dan waktunya.</div>
+          <div><b>Promosi langsung ke toko</b>Sisipkan link toko Tokopedia atau Shopee ke setiap postingan.</div>
         </div>
       </div></div>`;
     return;
@@ -116,18 +120,25 @@ function render() {
         <div class="home-col">
           <section>
             <div class="section-head"><h2>Akun</h2><button class="link" data-add>Tambah akun</button></div>
-            <div class="acct-list">
-              ${accounts.map(a => {
-                const p = platformOf(a);
-                const n = S.unread[a.id] || 0;
-                const auto = a.platform === 'telegram' && hasBot(a.id);
-                return `<button class="acct-row" data-acct="${a.id}">
-                  ${tile(a, 'lg', true)}
-                  <span class="meta"><b>${esc(a.name)}</b><span>${esc(p.name)}${auto ? ' · posting otomatis' : ''}${a.muted ? ' · notifikasi mati' : ''}</span></span>
-                  ${n ? `<span class="unread">${n} baru</span>` : ''}
-                </button>`;
-              }).join('')}
-            </div>
+            ${['social', 'shop'].map(kind => {
+              const list = accounts.filter(a => kindOf(a) === kind);
+              if (!list.length) return kind === 'shop'
+                ? `<button class="acct-row add-shop" data-add-kind="shop"><span class="add-box-lg">${icon('store', 20)}</span>
+                    <span class="meta"><b>Hubungkan toko online</b><span>Tokopedia atau Shopee, untuk promosi langsung ke tokomu</span></span></button>`
+                : '';
+              return `<h3 class="acct-kind">${KIND_LABEL[kind]}</h3>
+                <div class="acct-list">${list.map(a => {
+                  const p = platformOf(a);
+                  const n = S.unread[a.id] || 0;
+                  const auto = a.platform === 'telegram' && hasBot(a.id);
+                  const extra = kind === 'shop' ? (a.shopUrl ? ' · link toko tersimpan' : ' · link toko belum diatur') : (auto ? ' · posting otomatis' : '');
+                  return `<button class="acct-row" data-acct="${a.id}">
+                    ${tile(a, 'lg', true)}
+                    <span class="meta"><b>${esc(a.name)}</b><span>${esc(p.name)}${extra}${a.muted ? ' · notifikasi mati' : ''}</span></span>
+                    ${n ? `<span class="unread">${n} baru</span>` : ''}
+                  </button>`;
+                }).join('')}</div>`;
+            }).join('')}
           </section>
         </div>
       </div>
@@ -135,7 +146,7 @@ function render() {
 }
 
 function onClick(e) {
-  const b = e.target.closest('[data-assist],[data-post],[data-go],[data-acct],[data-add],[data-quick]');
+  const b = e.target.closest('[data-assist],[data-post],[data-go],[data-acct],[data-add],[data-add-kind],[data-quick]');
   if (!b) return;
   if (b.dataset.assist) { e.stopPropagation(); emit('assist', b.dataset.assist); return; }
   if (b.dataset.post) {
@@ -148,6 +159,7 @@ function onClick(e) {
   if (b.dataset.go) go({ name: b.dataset.go });
   if (b.dataset.acct) go({ name: 'account', id: b.dataset.acct });
   if ('add' in b.dataset) emit('add-account');
+  if (b.dataset.addKind) emit('add-account-kind', b.dataset.addKind);
   if (b.dataset.quick) emit('quick-add', b.dataset.quick);
 }
 function onKey(e) {

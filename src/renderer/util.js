@@ -1,3 +1,5 @@
+// Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
+//
 // Small helpers shared by every view.
 import { icon } from './icons.js';
 

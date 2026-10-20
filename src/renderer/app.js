@@ -1,7 +1,9 @@
+// Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
+//
 // Serambi — interface shell: sidebar, routing, account web views and the posting helper.
 import { icon } from './icons.js';
 import { $, $$, esc, toast, openModal, confirmDialog, promptDialog, showMenu, debounce, snippet } from './util.js';
-import { S, api, on, go, emit, account, platformOf, tile, tileForPlatform, mediaTag, targetChip, hasBot, modKey, PLATFORM_DESC } from './ctx.js';
+import { S, api, on, go, emit, account, platformOf, tile, tileForPlatform, mediaTag, targetChip, hasBot, modKey, PLATFORM_DESC, KIND_LABEL, kindOf, orderedAccounts, homeOf, updateLine } from './ctx.js';
 import HomeView from './views/home.js';
 import ComposeView from './views/compose.js';
 import ScheduleView from './views/schedule.js';
@@ -27,7 +29,7 @@ function renderSidebar() {
       ${icon(ic, 19)}<span class="label">${label}</span>${extra}
     </button>`;
 
-  const accts = accounts.map((a) => {
+  const accRow = (a) => {
     const p = platformOf(a);
     const n = S.unread[a.id] || 0;
     const active = r.name === 'account' && r.id === a.id;
@@ -38,7 +40,19 @@ function renderSidebar() {
         <span class="label"><span class="name">${esc(a.name)}</span><span class="sub">${a.muted ? 'Notifikasi mati' : esc(p.name)}</span></span>
         ${n ? `<span class="sb-count ${a.muted ? 'soft' : ''}">${n > 99 ? '99+' : n}</span>` : ''}
       </button>`;
-  }).join('');
+  };
+  const social = accounts.filter(a => kindOf(a) === 'social');
+  const shops = accounts.filter(a => kindOf(a) === 'shop');
+  const section = (label, list, kind) => `
+      <div class="sb-section"><span>${label}</span>
+        <button class="sb-icon-btn" data-add="${kind}" title="Tambah ${label.toLowerCase()}">${icon('plus', 16)}</button>
+      </div>
+      ${list.map(accRow).join('')}`;
+  const u = S.update;
+  const updatePill = u && (u.status === 'downloaded' || (u.status === 'available' && u.mode === 'manual'))
+    ? `<button class="sb-item sb-update" data-update title="${u.status === 'downloaded' ? 'Mulai ulang untuk memasang' : 'Unduh versi baru'} Serambi ${esc(u.version)}">
+        ${icon('circle-arrow-down', 19)}<span class="label">${u.status === 'downloaded' ? 'Perbarui ke ' : 'Versi baru '}${esc(u.version)}</span></button>`
+    : '';
 
   $('#sidebar').innerHTML = `
     <div class="sb-top">
@@ -50,15 +64,15 @@ function renderSidebar() {
       ${nav('home', 'house', 'Beranda')}
       ${nav('compose', 'square-pen', 'Tulis postingan', '', `Tulis postingan (${modKey()}+N)`)}
       ${nav('schedule', 'calendar-days', 'Jadwal', due ? `<span class="sb-count">${due}</span>` : '')}
-      <div class="sb-section"><span>Akun</span>
-        ${accounts.length ? `<button class="sb-icon-btn" data-add title="Tambah akun">${icon('plus', 16)}</button>` : ''}
-      </div>
-      ${accts}
+      ${accounts.length ? section('Media sosial', social, 'social') : ''}
+      ${shops.length ? section('Toko online', shops, 'shop') : ''}
+      ${!accounts.length ? '<div class="sb-section"><span>Akun</span></div>' : ''}
       <button class="sb-item sb-add" data-add title="Tambah akun">
         <span class="add-box">${icon('plus', 16)}</span><span class="label">Tambah akun</span>
       </button>
     </div>
     <div class="sb-bottom">
+      ${updatePill}
       ${nav('settings', 'settings', 'Pengaturan')}
       ${collapsed ? `<button class="sb-item" data-collapse title="Lebarkan panel">${icon('panel-left-open', 19)}</button>` : ''}
     </div>`;
@@ -71,7 +85,11 @@ function bindSidebar() {
     if (!b) return;
     if (b.dataset.go) go({ name: b.dataset.go });
     else if (b.dataset.acct) go({ name: 'account', id: b.dataset.acct });
-    else if ('add' in b.dataset) openAddAccount();
+    else if ('add' in b.dataset) openAddAccount(null, b.dataset.add || null);
+    else if ('update' in b.dataset) {
+      if (S.update && S.update.status === 'downloaded') api.installUpdate();
+      else api.downloadUpdate();
+    }
     else if ('collapse' in b.dataset) api.setSettings({ sidebarCollapsed: !S.state.settings.sidebarCollapsed });
   });
   sb.addEventListener('contextmenu', (e) => {
@@ -155,7 +173,7 @@ function ensureWebview(acc) {
   });
   el.addEventListener('did-navigate', refresh);
   el.addEventListener('did-navigate-in-page', refresh);
-  el.setAttribute('src', p.home);
+  el.setAttribute('src', homeOf(acc));
   $('#webviews').appendChild(el);
   return rec;
 }
@@ -208,7 +226,7 @@ function renderWvState() {
       <h3>${esc(p.name)} tidak bisa dibuka</h3>
       <p>Periksa koneksi internet, lalu coba lagi.${rec.error ? ` <span class="faint">(${esc(rec.error)})</span>` : ''}</p>
       <button class="btn primary" data-retry>${icon('rotate-cw', 16)}Coba lagi</button>`;
-    box.querySelector('[data-retry]').onclick = () => { rec.state = 'loading'; rec.failed = false; renderWvState(); rec.el.loadURL(p.home); };
+    box.querySelector('[data-retry]').onclick = () => { rec.state = 'loading'; rec.failed = false; renderWvState(); rec.el.loadURL(homeOf(acc)); };
   } else {
     box.innerHTML = `${tile(acc, 'xl')}<h3>Membuka ${esc(p.name)}…</h3><p>Masuk sekali saja. Serambi mengingat login akun ini.</p>`;
   }
@@ -225,11 +243,13 @@ function renderAccountBar(acc) {
       <button class="icon-btn" data-nav="back" title="Kembali">${icon('arrow-left')}</button>
       <button class="icon-btn" data-nav="forward" title="Maju">${icon('arrow-right')}</button>
       <button class="icon-btn" data-nav="reload" title="Muat ulang (${modKey()}+R)">${icon('rotate-cw')}</button>
-      <button class="icon-btn" data-nav="home" title="Halaman utama ${esc(p.name)}">${icon('house')}</button>
+      <button class="icon-btn" data-nav="home" title="${acc.homeUrl ? 'Halaman awal akun ini' : 'Halaman utama ' + esc(p.name)}">${icon('house')}</button>
+      <button class="icon-btn" data-marks title="Pintasan halaman">${icon('bookmark')}</button>
     </div>
     <span class="zoom-label" data-zoom></span>
     <span class="grow"></span>
-    <button class="btn sm" data-write>${icon('square-pen', 15)}Tulis postingan</button>
+    ${kindOf(acc) === 'shop' && acc.shopUrl ? `<button class="btn ghost sm" data-copy-shop title="${esc(acc.shopUrl)}">${icon('link', 15)}Salin link toko</button>` : ''}
+    <button class="btn sm" data-write>${icon('square-pen', 15)}${kindOf(acc) === 'shop' ? 'Tulis promosi' : 'Tulis postingan'}</button>
     <button class="icon-btn" data-more title="Pilihan akun">${icon('ellipsis')}</button>`;
   tb.onclick = (e) => {
     const b = e.target.closest('button');
@@ -241,8 +261,12 @@ function renderAccountBar(acc) {
         if (b.dataset.nav === 'back') el.goBack();
         if (b.dataset.nav === 'forward') el.goForward();
         if (b.dataset.nav === 'reload') el.reload();
-        if (b.dataset.nav === 'home') el.loadURL(p.home);
+        if (b.dataset.nav === 'home') el.loadURL(homeOf(acc));
       } catch (_) {}
+    } else if ('marks' in b.dataset) {
+      bookmarksMenu(b, acc.id);
+    } else if ('copyShop' in b.dataset) {
+      api.copyText(acc.shopUrl).then(() => toast('Link toko disalin'));
     } else if ('write' in b.dataset) {
       go({ name: 'compose', targets: [acc.id] });
     } else if ('more' in b.dataset) {
@@ -296,18 +320,90 @@ function accountMenu(anchor, id, align = 'right') {
   const acc = account(id);
   if (!acc) return;
   const p = platformOf(acc);
+  const shop = kindOf(acc) === 'shop';
   showMenu(anchor, [
     { heading: `${acc.name} · ${p.name}` },
     { label: 'Ganti nama', icon: 'pencil', onClick: () => renameAccount(acc) },
+    ...(shop ? [{ label: acc.shopUrl ? 'Ubah link toko' : 'Atur link toko', icon: 'link', onClick: () => editShopUrl(acc) }] : []),
     { label: acc.muted ? 'Nyalakan notifikasi' : 'Matikan notifikasi', icon: acc.muted ? 'bell' : 'bell-off', onClick: () => toggleMute(acc) },
-    { label: 'Tulis postingan untuk akun ini', icon: 'square-pen', onClick: () => go({ name: 'compose', targets: [acc.id] }) },
+    { label: shop ? 'Tulis promosi untuk toko ini' : 'Tulis postingan untuk akun ini', icon: 'square-pen', onClick: () => go({ name: 'compose', targets: [acc.id] }) },
     'sep',
+    { label: 'Jadikan halaman ini halaman awal', icon: 'house-plus', onClick: () => setHomeHere(acc) },
+    ...(acc.homeUrl ? [{ label: `Kembalikan halaman awal ${p.name}`, icon: 'house', onClick: () => resetHome(acc) }] : []),
     { label: 'Muat ulang', icon: 'rotate-cw', onClick: () => { const r = WV.get(acc.id); if (r) r.el.reload(); } },
     { label: 'Buka di browser', icon: 'external-link', onClick: () => { const r = WV.get(acc.id); let url = p.home; try { if (r && r.ready) url = r.el.getURL(); } catch (_) {} api.openExternal(url); } },
     'sep',
     { label: 'Keluar dari akun', icon: 'log-out', onClick: () => logoutAccount(acc) },
     { label: 'Hapus dari Serambi', icon: 'trash-2', danger: true, onClick: () => removeAccount(acc) }
   ], { align });
+}
+
+function currentUrl(accId) {
+  const rec = WV.get(accId);
+  try { return rec && rec.ready ? rec.el.getURL() : null; } catch (_) { return null; }
+}
+function currentTitle(accId) {
+  const rec = WV.get(accId);
+  try { return rec && rec.ready ? rec.el.getTitle() : ''; } catch (_) { return ''; }
+}
+
+async function setHomeHere(acc) {
+  const url = currentUrl(acc.id);
+  if (!url || !/^https:\/\//.test(url)) { toast('Buka dulu halaman yang ingin dijadikan halaman awal', { kind: 'info' }); return; }
+  await api.updateAccount({ id: acc.id, patch: { homeUrl: url } });
+  toast(`${acc.name} akan selalu dibuka di halaman ini`);
+}
+async function resetHome(acc) {
+  await api.updateAccount({ id: acc.id, patch: { homeUrl: '' } });
+  toast(`Halaman awal ${acc.name} dikembalikan`);
+}
+
+/** Saved pages per account: Seller Center menus, a group, a page inbox, and so on. */
+function bookmarksMenu(anchor, accId) {
+  const acc = account(accId);
+  if (!acc) return;
+  const marks = acc.bookmarks || [];
+  const url = currentUrl(acc.id);
+  const saved = url && marks.some(m => m.url === url);
+  const open = (u) => { const rec = WV.get(acc.id); if (rec) rec.el.loadURL(u); };
+  const items = [];
+  if (marks.length) {
+    items.push({ heading: 'Pintasan tersimpan' });
+    marks.forEach(m => items.push({ label: m.title, icon: 'bookmark', onClick: () => open(m.url) }));
+    items.push('sep');
+  }
+  items.push({ label: 'Halaman awal', icon: 'house', onClick: () => open(homeOf(acc)) });
+  if (url && !saved) items.push({ label: 'Simpan halaman ini sebagai pintasan', icon: 'bookmark-plus', onClick: () => addBookmark(acc, url) });
+  if (saved) items.push({ label: 'Hapus halaman ini dari pintasan', icon: 'trash-2', onClick: () => removeBookmark(acc, url) });
+  showMenu(anchor, items, { align: 'left' });
+}
+async function addBookmark(acc, url) {
+  const suggested = (currentTitle(acc.id) || '').replace(/^\(\d+\+?\)\s*/, '').slice(0, 60) || platformOf(acc).name;
+  const title = await promptDialog({ title: 'Simpan pintasan', label: 'Nama pintasan', value: suggested, confirm: 'Simpan pintasan', placeholder: 'Misalnya: Pesanan baru' });
+  if (!title) return;
+  const marks = [...(account(acc.id).bookmarks || []), { title, url }];
+  await api.updateAccount({ id: acc.id, patch: { bookmarks: marks } });
+  toast('Pintasan disimpan');
+}
+async function removeBookmark(acc, url) {
+  const marks = (account(acc.id).bookmarks || []).filter(m => m.url !== url);
+  await api.updateAccount({ id: acc.id, patch: { bookmarks: marks } });
+  toast('Pintasan dihapus');
+}
+
+export async function editShopUrl(acc) {
+  const p = platformOf(acc);
+  const v = await promptDialog({
+    title: `Link toko ${acc.name}`,
+    label: `Alamat toko yang dilihat pembeli di ${p.name}`,
+    value: acc.shopUrl || '',
+    placeholder: p.shopUrlHint || 'https://',
+    confirm: 'Simpan link'
+  });
+  if (v === null) return;
+  const url = /^https?:\/\//i.test(v) ? v : 'https://' + v;
+  await api.updateAccount({ id: acc.id, patch: { shopUrl: url } });
+  toast('Link toko disimpan. Sisipkan ke postingan lewat tombol Link toko.');
 }
 
 async function renameAccount(acc) {
@@ -348,26 +444,33 @@ async function removeAccount(acc) {
   toast(`${acc.name} dihapus`);
 }
 
-export function openAddAccount(preset) {
+export function openAddAccount(preset, kindFirst) {
   const ids = Object.keys(S.platforms);
   let chosen = preset || null;
   const desc = PLATFORM_DESC;
+  const kinds = kindFirst === 'shop' ? ['shop', 'social'] : ['social', 'shop'];
+  const group = (kind) => `
+      <div class="pick-group">
+        <h3>${KIND_LABEL[kind]}</h3>
+        <div class="pick-grid" role="radiogroup" aria-label="${KIND_LABEL[kind]}">
+          ${ids.filter(id => (S.platforms[id].kind || 'social') === kind).map(id => {
+            const p = S.platforms[id];
+            return `<button class="pick-card ${chosen === id ? 'selected' : ''}" data-p="${id}" style="--c:${p.color}" role="radio" aria-checked="${chosen === id}">
+              ${tileForPlatform(id, '')}<span><b>${esc(p.name)}</b><span>${esc(desc[id] || '')}</span></span></button>`;
+          }).join('')}
+        </div>
+      </div>`;
   const m = openModal({
     title: 'Tambah akun',
+    wide: true,
     body: `
-      <div class="platform-grid" role="radiogroup" aria-label="Platform">
-        ${ids.map(id => {
-          const p = S.platforms[id];
-          return `<button class="platform-card ${chosen === id ? 'selected' : ''}" data-p="${id}" style="--c:${p.color}" role="radio" aria-checked="${chosen === id}">
-            ${tileForPlatform(id, 'lg')}<div><b>${esc(p.name)}</b><span>${desc[id] || ''}</span></div></button>`;
-        }).join('')}
-      </div>
+      ${kinds.map(group).join('')}
       <div class="field">
         <label for="acc-name">Nama akun di Serambi</label>
         <input id="acc-name" class="input" maxlength="40" placeholder="Pilih platform dulu">
         <span class="hint">Misalnya “Toko Batik” atau “Pribadi”. Berguna kalau kamu punya beberapa akun di platform yang sama.</span>
       </div>
-      <p class="hint">${icon('info', 14, 'inline')} Kamu masuk langsung di halaman resmi platform. Serambi tidak melihat atau menyimpan kata sandimu.</p>`,
+      <p class="hint" data-kind-hint>${icon('info', 14, 'inline')} Kamu masuk langsung di halaman resmi platform. Serambi tidak melihat atau menyimpan kata sandimu.</p>`,
     foot: `<button class="btn ghost" data-no>Batal</button><button class="btn primary" data-yes disabled>Tambah & masuk</button>`
   });
   const name = m.el.querySelector('#acc-name');
@@ -379,12 +482,16 @@ export function openAddAccount(preset) {
   let edited = false;
   const pick = (pid) => {
     chosen = pid;
-    m.el.querySelectorAll('.platform-card').forEach(c => { c.classList.toggle('selected', c.dataset.p === pid); c.setAttribute('aria-checked', c.dataset.p === pid); });
+    m.el.querySelectorAll('.pick-card').forEach(c => { c.classList.toggle('selected', c.dataset.p === pid); c.setAttribute('aria-checked', c.dataset.p === pid); });
     if (!edited) name.value = suggest(pid);
+    const hint = m.el.querySelector('[data-kind-hint]');
+    hint.innerHTML = S.platforms[pid].kind === 'shop'
+      ? `${icon('info', 14, 'inline')} Masuk dengan akun penjual di Seller Center ${esc(S.platforms[pid].name)} resmi. Serambi tidak melihat atau menyimpan kata sandimu.`
+      : `${icon('info', 14, 'inline')} Kamu masuk langsung di halaman resmi platform. Serambi tidak melihat atau menyimpan kata sandimu.`;
     name.placeholder = '';
     yes.disabled = false;
   };
-  m.el.querySelectorAll('.platform-card').forEach(c => c.onclick = () => pick(c.dataset.p));
+  m.el.querySelectorAll('.pick-card').forEach(c => c.onclick = () => pick(c.dataset.p));
   name.addEventListener('input', () => { edited = true; });
   if (preset) pick(preset);
   m.el.querySelector('[data-no]').onclick = () => m.close();
@@ -488,6 +595,12 @@ async function startDock(postId, accountId) {
   S.assist = { postId, accountId };
   if (p.text) await api.copyText(p.text);
   go({ name: 'account', id: accountId });
+  const pl = platformOf(acc);
+  if (pl.composeUrl && !acc.homeUrl) {
+    const rec = ensureWebview(acc);
+    const load = () => { try { rec.el.loadURL(pl.composeUrl); } catch (_) {} };
+    if (rec.ready) load(); else rec.el.addEventListener('dom-ready', load, { once: true });
+  }
   // X accepts the text through its share link, so the compose box opens pre-filled.
   if (acc.platform === 'x' && p.text && p.text.length < 4000) {
     const rec = ensureWebview(acc);
@@ -597,9 +710,10 @@ function handleState(next) {
 }
 
 function handleCommand(cmd) {
-  const accs = S.state.accounts;
+  const accs = orderedAccounts();
   switch (cmd.type) {
-    case 'go': return go({ name: cmd.route });
+    case 'go': return go({ name: cmd.route, section: cmd.section });
+    case 'about': return openAbout();
     case 'account': if (accs[cmd.index]) go({ name: 'account', id: accs[cmd.index].id }); return;
     case 'next-account':
     case 'prev-account': {
@@ -619,10 +733,56 @@ function handleCommand(cmd) {
 // Keyboard shortcuts while the interface itself has focus are handled by the main
 // process (before-input-event) on Windows/Linux and by the menu on macOS.
 
+// =====================================================================
+// About & updates
+// =====================================================================
+function openAbout() {
+  const m = openModal({
+    title: 'Tentang Serambi',
+    body: `
+      <div class="about">
+        <div class="about-mark">${BRAND_MARK}</div>
+        <div>
+          <b class="about-name">Serambi</b>
+          <span class="about-ver">Versi ${esc(S.version)}</span>
+        </div>
+      </div>
+      <p>Satu aplikasi untuk mengelola media sosial dan toko online: Instagram, Facebook, X, TikTok, WhatsApp, Telegram, Tokopedia, dan Shopee.</p>
+      <div class="about-owner">
+        <span>${icon('copyright', 16)}</span>
+        <div><b>${esc(S.owner.copyright)}</b>
+          <span>Pemilik dan pengembang: ${esc(S.owner.name)} · <button class="link" data-mail>${esc(S.owner.email)}</button></span></div>
+      </div>
+      <p class="hint" data-about-update>${esc(updateLine(S.update))}</p>
+      <p class="hint">Dibangun dengan Electron (MIT), ikon Lucide (ISC), dan huruf Plus Jakarta Sans (SIL Open Font License 1.1).</p>`,
+    foot: `<button class="btn ghost" data-check>${icon('refresh-cw', 15)}Periksa pembaruan</button><span style="flex:1"></span><button class="btn primary" data-ok>Tutup</button>`
+  });
+  m.el.querySelector('[data-mail]').onclick = () => api.openMail();
+  m.el.querySelector('[data-ok]').onclick = () => m.close();
+  m.el.querySelector('[data-check]').onclick = () => api.checkUpdate();
+  const unsub = onUpdateChange(() => { const el = m.el.querySelector('[data-about-update]'); if (el) el.textContent = updateLine(S.update); });
+  const obs = new MutationObserver(() => { if (!document.body.contains(m.el)) { unsub(); obs.disconnect(); } });
+  obs.observe(document.body, { childList: true, subtree: true });
+}
+
+const updateListeners = new Set();
+function onUpdateChange(fn) { updateListeners.add(fn); return () => updateListeners.delete(fn); }
+function handleUpdate(u) {
+  const prev = S.update;
+  S.update = u;
+  const changed = !prev || prev.status !== u.status || prev.version !== u.version;
+  if (changed) renderSidebar();
+  if (currentView && currentView.onUpdate) currentView.onUpdate();
+  updateListeners.forEach(fn => fn());
+}
+
 on('go', navigate);
 on('assist', openAssist);
-on('add-account', (preset) => openAddAccount(preset));
+on('add-account', (preset) => openAddAccount(preset, preset ? null : undefined));
+on('add-account-kind', (kind) => openAddAccount(null, kind));
 on('quick-add', quickAddAccount);
+on('about', openAbout);
+on('edit-shop', (id) => { const a = account(id); if (a) editShopUrl(a); });
 
 async function boot() {
   const init = await api.init();
@@ -631,15 +791,18 @@ async function boot() {
   S.os = init.os;
   S.version = init.version;
   S.mediaBase = init.mediaBase;
+  S.owner = init.owner;
+  S.update = init.update;
   document.body.classList.add('os-' + S.os);
   bindSidebar();
   api.onState(handleState);
   api.onCommand(handleCommand);
+  api.onUpdate(handleUpdate);
   navigate({ name: 'home' });
 
   // Load every account in the background so chats, notifications and badges stay live.
   if (S.state.settings.preloadAccounts !== false) {
-    S.state.accounts.forEach((acc, i) => setTimeout(() => { if (account(acc.id)) ensureWebview(acc); }, 1200 + i * 1500));
+    orderedAccounts().forEach((acc, i) => setTimeout(() => { if (account(acc.id)) ensureWebview(acc); }, 1200 + i * 1500));
   }
 }
 

@@ -1,3 +1,5 @@
+// Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
+//
 // Generates the app icon, tray icons and badge overlay as PNG files.
 // Run: node scripts/gen-assets.js
 const sharp = require('sharp');

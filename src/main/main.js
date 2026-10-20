@@ -1,4 +1,6 @@
-// Serambi — main process
+// Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
+//
+// Main process: windows, account sessions, scheduler, Telegram, notifications, tray, updates.
 const {
   app, BrowserWindow, ipcMain, session, shell, Menu, Tray, Notification, nativeTheme,
   nativeImage, clipboard, dialog, powerMonitor, protocol, net
@@ -9,6 +11,8 @@ const { pathToFileURL } = require('url');
 const { Store, uid } = require('./store');
 const { PLATFORMS, AUTH_HOSTS, hostMatches } = require('./platforms');
 const telegram = require('./telegram');
+const cfg = require('./config');
+const { Updater } = require('./updater');
 
 const isMac = process.platform === 'darwin';
 const isWin = process.platform === 'win32';
@@ -42,6 +46,7 @@ let store;
 let win = null;
 let tray = null;
 let quitting = false;
+let updater = null;
 const notifications = new Set();
 const running = new Set();
 
@@ -178,8 +183,14 @@ function attachContextMenu(contents) {
 }
 
 // ---------- webview guards ----------
+function accountOfContents(contents) {
+  // Every account has its own session partition, so the session tells us whose page this is.
+  if (!store) return null;
+  return store.data.accounts.find(a => session.fromPartition(partitionFor(a.id)) === contents.session) || null;
+}
 function platformOfContents(contents) {
-  // Partition name is not exposed, so match by the page that is loaded.
+  const acc = accountOfContents(contents);
+  if (acc) return PLATFORMS[acc.platform] || null;
   try {
     const host = new URL(contents.getURL()).hostname;
     return Object.values(PLATFORMS).find(p => hostMatches(host, p.domains)) || null;
@@ -328,6 +339,18 @@ function createWindow() {
 }
 
 // ---------- tray & menu ----------
+function trayMenu() {
+  const ready = updater && updater.state.status === 'downloaded';
+  return Menu.buildFromTemplate([
+    { label: 'Buka Serambi', click: showWindow },
+    { label: 'Tulis postingan', click: () => { showWindow(); sendCmd({ type: 'go', route: 'compose' }); } },
+    { label: 'Lihat jadwal', click: () => { showWindow(); sendCmd({ type: 'go', route: 'schedule' }); } },
+    ...(ready ? [{ type: 'separator' }, { label: `Mulai ulang & perbarui ke ${updater.state.version}`, click: () => updater.install() }] : []),
+    { type: 'separator' },
+    { label: 'Keluar dari Serambi', click: () => { quitting = true; app.quit(); } }
+  ]);
+}
+
 function createTray() {
   const img = isMac
     ? nativeImage.createFromPath(path.join(ASSETS, 'trayTemplate.png'))
@@ -335,19 +358,20 @@ function createTray() {
   if (isMac) img.setTemplateImage(true);
   tray = new Tray(img);
   tray.setToolTip('Serambi');
-  const menu = Menu.buildFromTemplate([
-    { label: 'Buka Serambi', click: showWindow },
-    { label: 'Tulis postingan', click: () => { showWindow(); sendCmd({ type: 'go', route: 'compose' }); } },
-    { label: 'Lihat jadwal', click: () => { showWindow(); sendCmd({ type: 'go', route: 'schedule' }); } },
-    { type: 'separator' },
-    { label: 'Keluar dari Serambi', click: () => { quitting = true; app.quit(); } }
-  ]);
-  tray.setContextMenu(menu);
+  tray.setContextMenu(trayMenu());
   if (!isMac) tray.on('click', showWindow);
 }
 
 function buildMenu() {
   const cmd = (c) => () => { showWindow(); sendCmd(c); };
+  const checkUpdates = () => { showWindow(); sendCmd({ type: 'go', route: 'settings', section: 'update' }); if (updater) updater.check(true); };
+  const helpMenu = {
+    label: 'Bantuan',
+    submenu: [
+      ...(!isMac ? [{ label: 'Tentang Serambi', click: cmd({ type: 'about' }) }, { label: 'Periksa pembaruan…', click: checkUpdates }, { type: 'separator' }] : []),
+      { label: 'Kirim masukan lewat email', click: () => shell.openExternal(`mailto:${cfg.AUTHOR_EMAIL}?subject=${encodeURIComponent('Masukan Serambi ' + app.getVersion())}`) }
+    ]
+  };
   const accountItems = Array.from({ length: 9 }, (_, i) => ({
     label: `Akun ${i + 1}`, accelerator: `CmdOrCtrl+${i + 1}`, click: cmd({ type: 'account', index: i })
   }));
@@ -355,7 +379,8 @@ function buildMenu() {
     ...(isMac ? [{
       label: 'Serambi',
       submenu: [
-        { role: 'about', label: 'Tentang Serambi' },
+        { label: 'Tentang Serambi', click: cmd({ type: 'about' }) },
+        { label: 'Periksa pembaruan…', click: checkUpdates },
         { type: 'separator' },
         { label: 'Pengaturan…', accelerator: 'Cmd+,', click: cmd({ type: 'go', route: 'settings' }) },
         { type: 'separator' },
@@ -413,7 +438,8 @@ function buildMenu() {
         ...accountItems
       ]
     },
-    { role: 'windowMenu', label: 'Jendela' }
+    { role: 'windowMenu', label: 'Jendela' },
+    helpMenu
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -544,7 +570,9 @@ function registerIpc() {
     platforms: PLATFORMS,
     os: process.platform,
     version: app.getVersion(),
-    mediaBase: 'serambi://media/'
+    mediaBase: 'serambi://media/',
+    owner: { name: cfg.AUTHOR, email: cfg.AUTHOR_EMAIL, copyright: cfg.COPYRIGHT },
+    update: updater ? updater.state : null
   }));
 
   h('accounts:add', ({ platform, name }) => {
@@ -559,6 +587,21 @@ function registerIpc() {
     const a = findAccount(id); if (!a) return;
     if (typeof patch.name === 'string' && patch.name.trim()) a.name = patch.name.trim().slice(0, 40);
     if (typeof patch.muted === 'boolean') a.muted = patch.muted;
+    if ('homeUrl' in patch) {
+      if (patch.homeUrl && /^https:\/\//i.test(patch.homeUrl)) a.homeUrl = String(patch.homeUrl).slice(0, 2000);
+      else delete a.homeUrl;
+    }
+    if ('shopUrl' in patch) {
+      const v = String(patch.shopUrl || '').trim();
+      if (v && /^https?:\/\//i.test(v)) a.shopUrl = v.slice(0, 500);
+      else delete a.shopUrl;
+    }
+    if (Array.isArray(patch.bookmarks)) {
+      a.bookmarks = patch.bookmarks
+        .filter(b => b && /^https:\/\//i.test(b.url))
+        .slice(0, 20)
+        .map(b => ({ title: String(b.title || b.url).slice(0, 80), url: String(b.url).slice(0, 2000) }));
+    }
     store.save(); broadcast();
   });
   h('accounts:reorder', (ids) => {
@@ -636,10 +679,11 @@ function registerIpc() {
 
   h('settings:set', (patch) => {
     const s = store.data.settings;
-    for (const k of ['theme', 'notifications', 'closeToTray', 'launchAtLogin', 'preloadAccounts', 'sidebarCollapsed']) {
+    for (const k of ['theme', 'notifications', 'closeToTray', 'launchAtLogin', 'preloadAccounts', 'sidebarCollapsed', 'autoUpdate']) {
       if (k in patch) s[k] = patch[k];
     }
     if ('theme' in patch) nativeTheme.themeSource = ['light', 'dark'].includes(s.theme) ? s.theme : 'system';
+    if ('autoUpdate' in patch && updater) updater.setAutoDownload(s.autoUpdate !== false);
     if ('launchAtLogin' in patch) {
       try { app.setLoginItemSettings({ openAtLogin: !!s.launchAtLogin, args: ['--hidden'] }); } catch (_) {}
     }
@@ -721,7 +765,11 @@ function registerIpc() {
       const known = new Set(store.data.accounts.map(a => a.id));
       for (const a of data.accounts) {
         if (!PLATFORMS[a.platform] || known.has(a.id)) continue;
-        store.data.accounts.push({ id: a.id, platform: a.platform, name: a.name, muted: !!a.muted, createdAt: a.createdAt || Date.now() });
+        const acc = { id: a.id, platform: a.platform, name: a.name, muted: !!a.muted, createdAt: a.createdAt || Date.now() };
+        if (typeof a.shopUrl === 'string' && /^https?:\/\//.test(a.shopUrl)) acc.shopUrl = a.shopUrl;
+        if (typeof a.homeUrl === 'string' && /^https:\/\//.test(a.homeUrl)) acc.homeUrl = a.homeUrl;
+        if (Array.isArray(a.bookmarks)) acc.bookmarks = a.bookmarks.filter(b => b && /^https:\/\//.test(b.url)).slice(0, 20);
+        store.data.accounts.push(acc);
         setupAccountSession(a);
       }
       const knownPosts = new Set(store.data.posts.map(p => p.id));
@@ -734,6 +782,11 @@ function registerIpc() {
       return { ok: false, error: 'Berkas cadangan tidak bisa dibaca.' };
     }
   });
+
+  h('update:check', () => updater ? updater.check(true) : null);
+  h('update:download', () => updater && updater.download());
+  h('update:install', () => updater && updater.install());
+  h('open:mail', () => shell.openExternal(`mailto:${cfg.AUTHOR_EMAIL}?subject=${encodeURIComponent('Serambi ' + app.getVersion())}`));
 
   const badgeImg = nativeImage.createFromPath(path.join(ASSETS, 'badge.png'));
   h('app:badge', (count) => {
@@ -783,6 +836,21 @@ app.whenReady().then(() => {
     if (win && !isMac) { try { win.setTitleBarOverlay(overlayColors()); } catch (_) {} }
   });
   for (const a of store.data.accounts) setupAccountSession(a);
+  app.setAboutPanelOptions({
+    applicationName: cfg.APP_NAME,
+    applicationVersion: app.getVersion(),
+    copyright: `${cfg.COPYRIGHT}\n${cfg.AUTHOR_EMAIL}`,
+    authors: [cfg.AUTHOR]
+  });
+  updater = new Updater({
+    getSettings: () => store.data.settings,
+    onChange: (state) => {
+      if (win && !win.isDestroyed()) win.webContents.send('update', state);
+      if (tray) tray.setContextMenu(trayMenu());
+    },
+    notify: (title, body) => notify(title, body, () => sendCmd({ type: 'go', route: 'settings', section: 'update' })),
+    prepareQuit: () => { quitting = true; if (store) store.save(true); }
+  });
   registerProtocol();
   registerIpc();
   buildMenu();
@@ -791,7 +859,8 @@ app.whenReady().then(() => {
   cleanupMedia();
   setTimeout(tick, 4000);
   setInterval(tick, 15000);
-  powerMonitor.on('resume', () => setTimeout(tick, 3000));
+  powerMonitor.on('resume', () => { setTimeout(tick, 3000); setTimeout(() => updater.maybeCheck(), 20000); });
+  updater.start();
 });
 
 app.on('activate', () => showWindow());

@@ -1,3 +1,5 @@
+// Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
+//
 // Bridge between the interface and the main process. Only these calls are exposed.
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
@@ -29,7 +31,12 @@ contextBridge.exposeInMainWorld('serambi', {
   exportBackup: invoke('backup:export'),
   importBackup: invoke('backup:import'),
   setBadge: invoke('app:badge'),
+  checkUpdate: invoke('update:check'),
+  downloadUpdate: invoke('update:download'),
+  installUpdate: invoke('update:install'),
+  openMail: invoke('open:mail'),
   pathForFile: (file) => { try { return webUtils.getPathForFile(file); } catch (_) { return null; } },
   onState: (fn) => ipcRenderer.on('state', (_e, s) => fn(s)),
-  onCommand: (fn) => ipcRenderer.on('cmd', (_e, c) => fn(c))
+  onCommand: (fn) => ipcRenderer.on('cmd', (_e, c) => fn(c)),
+  onUpdate: (fn) => ipcRenderer.on('update', (_e, u) => fn(u))
 });

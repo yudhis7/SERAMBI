@@ -1,10 +1,12 @@
+// Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
+//
 // Tulis postingan — compose once, send to several accounts now or later.
 import { icon } from '../icons.js';
 import {
   esc, toast, showMenu, promptDialog, confirmDialog, fmtDayLong, fmtTime, relDay, toDateInput, toTimeInput,
   fromInputs, addDays, startOfDay, charCount, snippet
 } from '../util.js';
-import { S, api, go, emit, account, platformOf, tile, mediaTag, hasBot, modKey } from '../ctx.js';
+import { S, api, go, emit, account, platformOf, tile, mediaTag, hasBot, modKey, KIND_LABEL, kindOf, orderedAccounts } from '../ctx.js';
 
 let root, tb, d, unsavedWarned;
 
@@ -52,15 +54,19 @@ function renderTargets() {
     return;
   }
   const all = accs.every(a => d.targets.has(a.id));
+  const kinds = ['social', 'shop'].filter(k => accs.some(a => kindOf(a) === k));
+  const chip = (a) => {
+    const on = d.targets.has(a.id);
+    return `<button class="target ${on ? 'on' : ''}" data-target="${a.id}" aria-pressed="${on}" title="${esc(platformOf(a).name)}">
+      ${tile(a)}<span>${esc(a.name)}</span><span class="check">${on ? icon('check', 11) : ''}</span></button>`;
+  };
   box.innerHTML = `
     <div class="section-head"><h2>Kirim ke</h2><button class="link target-all" data-all>${all ? 'Kosongkan pilihan' : 'Pilih semua'}</button></div>
-    <div class="targets" role="group" aria-label="Akun tujuan">
-      ${accs.map(a => {
-        const on = d.targets.has(a.id);
-        return `<button class="target ${on ? 'on' : ''}" data-target="${a.id}" aria-pressed="${on}" title="${esc(platformOf(a).name)}">
-          ${tile(a)}<span>${esc(a.name)}</span><span class="check">${on ? icon('check', 11) : ''}</span></button>`;
-      }).join('')}
-    </div>`;
+    ${kinds.map(k => `
+      ${kinds.length > 1 ? `<div class="target-kind">${KIND_LABEL[k]}</div>` : ''}
+      <div class="targets" role="group" aria-label="${KIND_LABEL[k]}">
+        ${orderedAccounts().filter(a => kindOf(a) === k).map(chip).join('')}
+      </div>`).join('')}`;
 }
 
 function renderMedia() {
@@ -80,7 +86,7 @@ function renderCounters() {
     const p = S.platforms[pid];
     let limit = p.limit;
     if (pid === 'telegram' && d.media.length) limit = 1024;
-    if (limit > 5000) return '';
+    if (!limit || limit > 5000) return '';
     const over = n > limit;
     return `<span class="${over ? 'over' : ''}" title="Batas ${esc(p.name)}">${esc(p.short)} ${n.toLocaleString('id-ID')}/${limit.toLocaleString('id-ID')}</span>`;
   }).filter(Boolean);
@@ -98,12 +104,24 @@ function warnings() {
   if (plats.includes('instagram') && tags > 30) out.push(`Instagram membatasi 30 tagar per postingan. Sekarang ada ${tags}.`);
   if (plats.includes('telegram') && d.media.length && n > 1024) out.push('Teks lebih dari 1.024 karakter, jadi di Telegram teksnya dikirim sebagai pesan terpisah setelah media.');
   if (plats.includes('x') && d.media.length > 4) out.push('X hanya menerima 4 gambar per postingan.');
+  if (plats.includes('tiktok') && !d.media.length) out.push('TikTok butuh video atau foto.');
+  if (plats.includes('tiktok') && n > 2200) out.push('Keterangan TikTok maksimal 2.200 karakter.');
+  const shops = selectedAccounts().filter(a => kindOf(a) === 'shop');
+  const linkInText = (a) => a.shopUrl && d.text.includes(a.shopUrl);
+  const socialChosen = selectedAccounts().some(a => kindOf(a) === 'social');
+  const allShops = S.state.accounts.filter(a => kindOf(a) === 'shop' && a.shopUrl);
+  if (socialChosen && allShops.length && d.text.trim() && !allShops.some(linkInText)) {
+    out.push({ info: true, text: 'Belum ada link toko di postingan ini. Sisipkan lewat tombol Link toko supaya pembeli langsung ke tokomu.' });
+  }
+  if (shops.length) out.push({ info: true, text: 'Untuk Tokopedia dan Shopee, Serambi membuka Seller Center dan menyalin teksnya. Tempel di menu promosi, chat, atau deskripsi produk.' });
   return out;
 }
 
 function renderWarnings() {
   const w = warnings();
-  root.querySelector('[data-region="warnings"]').innerHTML = w.map(t => `<div class="warning">${icon('circle-alert', 15)}<span>${esc(t)}</span></div>`).join('');
+  root.querySelector('[data-region="warnings"]').innerHTML = w.map(t => typeof t === 'string'
+    ? `<div class="warning">${icon('circle-alert', 15)}<span>${esc(t)}</span></div>`
+    : `<div class="warning info">${icon('info', 15)}<span>${esc(t.text)}</span></div>`).join('');
 }
 
 function highlight(text, cutAt) {
@@ -290,6 +308,36 @@ function insertAtCursor(text) {
   onTextChanged();
 }
 
+function appendText(line) {
+  const ta = root.querySelector('textarea');
+  const v = ta.value.replace(/\s+$/, '');
+  ta.value = v ? `${v}\n\n${line}` : line;
+  d.text = ta.value;
+  autosize(ta);
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+  onTextChanged();
+}
+
+/** Insert the buyer-facing link of a Tokopedia or Shopee shop. */
+function shopLinkMenu(anchor) {
+  const shops = orderedAccounts().filter(a => kindOf(a) === 'shop');
+  if (!shops.length) {
+    showMenu(anchor, [
+      { heading: 'Belum ada toko online' },
+      { label: 'Hubungkan Tokopedia atau Shopee', icon: 'store', onClick: () => emit('add-account-kind', 'shop') }
+    ], { align: 'left' });
+    return;
+  }
+  const items = [{ heading: 'Sisipkan link toko' }];
+  for (const a of shops) {
+    const p = platformOf(a);
+    if (a.shopUrl) items.push({ label: `${a.name} (${p.name})`, icon: 'link', onClick: () => appendText(`Belanja di ${p.name}: ${a.shopUrl}`) });
+    else items.push({ label: `Atur link ${a.name} dulu`, icon: 'pencil', onClick: () => emit('edit-shop', a.id) });
+  }
+  showMenu(anchor, items, { align: 'left' });
+}
+
 function templateMenu(anchor) {
   const items = [];
   const tpls = S.state.templates;
@@ -327,6 +375,8 @@ function onClick(e) {
     renderMedia(); renderCounters(); renderWarnings(); renderPreview(); saveWip();
   } else if ('pick' in b.dataset) {
     api.pickMedia().then(addMedia);
+  } else if ('shoplink' in b.dataset) {
+    shopLinkMenu(b);
   } else if ('templates' in b.dataset) {
     templateMenu(b);
   } else if (b.dataset.mode) {
@@ -421,6 +471,7 @@ export default {
               <div class="editor-tools">
                 <button class="btn ghost sm" data-pick title="Tambah foto atau video">${icon('image', 16)}Foto/video</button>
                 <button class="btn ghost sm" data-templates>${icon('file-text', 16)}Templat</button>
+                <button class="btn ghost sm" data-shoplink>${icon('store', 16)}Link toko</button>
                 <span class="grow"></span>
                 <div class="counters" data-region="counters"></div>
               </div>

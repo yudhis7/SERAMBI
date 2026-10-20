@@ -1,3 +1,5 @@
+// Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
+//
 // Posting to a Telegram channel or group through the official Bot API.
 const fs = require('fs');
 const path = require('path');

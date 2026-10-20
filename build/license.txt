@@ -1,0 +1,47 @@
+﻿SERAMBI — LISENSI PENGGUNAAN
+Hak cipta © 2026 Yudhistira (yudhie7@gmail.com). Seluruh hak dilindungi.
+
+Serambi, termasuk kode sumber, desain antarmuka, nama, logo, dan dokumentasinya
+("Perangkat Lunak"), adalah milik Yudhistira.
+
+1. Izin pemakaian
+   Kamu boleh memasang dan memakai Perangkat Lunak di komputer milikmu untuk
+   keperluan pribadi maupun usaha.
+
+2. Larangan
+   Tanpa izin tertulis dari Yudhistira, kamu tidak boleh:
+   a. menyalin, mengubah, menerjemahkan, atau membuat karya turunan dari
+      kode sumber Perangkat Lunak;
+   b. menjual, menyewakan, meminjamkan, mensublisensikan, atau
+      mendistribusikan ulang Perangkat Lunak, baik utuh maupun sebagian;
+   c. menghapus atau mengubah pemberitahuan hak cipta di dalamnya;
+   d. memakai nama atau logo Serambi untuk produk lain.
+
+3. Layanan pihak ketiga
+   Perangkat Lunak membuka situs resmi Instagram, Facebook, X, TikTok,
+   WhatsApp, Telegram, Tokopedia, dan Shopee. Pemakaian situs-situs itu tunduk
+   pada ketentuan masing-masing platform. Serambi tidak berafiliasi dengan
+   platform-platform tersebut.
+
+4. Komponen pihak ketiga
+   Perangkat Lunak memuat komponen sumber terbuka yang tetap tunduk pada
+   lisensinya sendiri. Daftarnya ada di THIRD_PARTY_NOTICES.md.
+
+5. Tanpa jaminan
+   Perangkat Lunak disediakan "sebagaimana adanya", tanpa jaminan apa pun.
+   Yudhistira tidak bertanggung jawab atas kerugian yang timbul dari
+   pemakaiannya, sejauh diizinkan hukum yang berlaku.
+
+Untuk izin, kerja sama, atau pertanyaan: yudhie7@gmail.com
+
+------------------------------------------------------------------------------
+
+SERAMBI — END USER LICENSE (English summary)
+Copyright © 2026 Yudhistira (yudhie7@gmail.com). All rights reserved.
+
+You may install and use Serambi on computers you own, for personal or business
+use. You may not copy, modify, redistribute, sell, sublicense, or create
+derivative works of Serambi or its source code, or remove its copyright
+notices, without written permission from Yudhistira. Third-party open-source
+components remain under their own licenses (see THIRD_PARTY_NOTICES.md).
+Serambi is provided "as is", without warranty of any kind.

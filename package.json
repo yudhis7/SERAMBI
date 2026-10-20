@@ -1,33 +1,45 @@
 {
   "name": "serambi",
   "productName": "Serambi",
-  "version": "1.0.0",
-  "description": "Kelola Instagram, Facebook, X, WhatsApp, dan Telegram dari satu aplikasi.",
+  "version": "1.1.0",
+  "description": "Kelola Instagram, Facebook, X, TikTok, WhatsApp, Telegram, Tokopedia, dan Shopee dari satu aplikasi.",
   "main": "src/main/main.js",
-  "author": "Serambi",
-  "license": "MIT",
+  "author": {
+    "name": "Yudhistira",
+    "email": "yudhie7@gmail.com"
+  },
+  "license": "SEE LICENSE IN LICENSE",
   "private": true,
   "scripts": {
     "start": "electron .",
     "icons": "node scripts/gen-icons.js && node scripts/gen-assets.js",
-    "dist:win": "electron-builder --win --x64",
-    "dist:mac": "electron-builder --mac --x64 --arm64",
-    "dist": "electron-builder --win --mac"
+    "dist:win": "electron-builder --win --x64 --publish never",
+    "dist:mac": "electron-builder --mac --x64 --arm64 --publish never",
+    "dist": "electron-builder --win --mac --publish never",
+    "release": "electron-builder --publish always"
   },
   "build": {
     "appId": "id.serambi.app",
     "productName": "Serambi",
-    "copyright": "Serambi",
+    "copyright": "Copyright © 2026 Yudhistira. Seluruh hak dilindungi.",
     "files": [
       "src/**/*",
       "assets/**/*",
-      "package.json"
+      "package.json",
+      "LICENSE"
     ],
     "directories": {
       "output": "dist",
       "buildResources": "build"
     },
-    "publish": null,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "yudhis7",
+        "repo": "serambi",
+        "releaseType": "release"
+      }
+    ],
     "win": {
       "icon": "build/icon-win.png",
       "target": [
@@ -51,7 +63,9 @@
         "id_ID",
         "en_US"
       ],
-      "language": "1057"
+      "language": "1057",
+      "license": "build/license.txt",
+      "uninstallDisplayName": "Serambi"
     },
     "mac": {
       "icon": "build/icon.png",
@@ -63,9 +77,16 @@
             "x64",
             "arm64"
           ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
-      "artifactName": "Serambi-${version}-${arch}.${ext}",
+      "artifactName": "Serambi-${version}-mac-${arch}.${ext}",
       "identity": "-",
       "extendInfo": {
         "NSCameraUsageDescription": "Serambi memakai kamera untuk panggilan video di WhatsApp, Telegram, dan platform lain.",
@@ -75,8 +96,19 @@
       "notarize": false
     },
     "dmg": {
-      "title": "Serambi ${version}"
-    }
+      "title": "Serambi ${version}",
+      "artifactName": "Serambi-${version}-${arch}.${ext}"
+    },
+    "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE.txt"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      }
+    ]
   },
   "devDependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
@@ -84,5 +116,13 @@
     "electron-builder": "^26.15.3",
     "lucide-static": "^1.59.0",
     "sharp": "^0.35.5"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "homepage": "https://github.com/yudhis7/serambi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yudhis7/serambi.git"
   }
 }

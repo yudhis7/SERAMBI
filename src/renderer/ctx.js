@@ -1,3 +1,5 @@
+// Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
+//
 // Shared state and small domain helpers for the interface.
 import { esc } from './util.js';
 import { icon } from './icons.js';
@@ -10,6 +12,8 @@ export const S = {
   os: 'win32',
   version: '',
   mediaBase: '',
+  owner: { name: '', email: '', copyright: '' },
+  update: null,         // auto-update status from the main process
   route: { name: 'home' },
   unread: {},           // accountId -> number
   assist: null,         // { postId, accountId } while the posting helper is docked
@@ -29,9 +33,25 @@ export const PLATFORM_DESC = {
   instagram: 'Feed, Reels, dan DM',
   facebook: 'Halaman, grup, dan Messenger',
   x: 'Postingan dan DM',
+  tiktok: 'Video, foto, dan pesan',
   whatsapp: 'Chat, grup, dan Status',
-  telegram: 'Chat, grup, dan channel'
+  telegram: 'Chat, grup, dan channel',
+  tokopedia: 'Seller Center Tokopedia & TikTok Shop',
+  shopee: 'Seller Centre Shopee'
 };
+
+export const KIND_LABEL = { social: 'Media sosial', shop: 'Toko online' };
+
+export function kindOf(acc) { return (S.platforms[acc?.platform] || {}).kind || 'social'; }
+
+/** Accounts in display order: social media first, then online shops (each keeps the user's order). */
+export function orderedAccounts() {
+  const all = S.state.accounts;
+  return [...all.filter(a => kindOf(a) === 'social'), ...all.filter(a => kindOf(a) === 'shop')];
+}
+
+/** Start page for an account: the page the user pinned, or the platform's own. */
+export function homeOf(acc) { return (acc && acc.homeUrl) || platformOf(acc).home; }
 
 export const modKey = () => (S.os === 'darwin' ? '⌘' : 'Ctrl');
 
@@ -46,11 +66,11 @@ export function tile(acc, size = '', withNum = false) {
     const same = S.state.accounts.filter(a => a.platform === acc.platform);
     if (same.length > 1) num = `<span class="num">${same.indexOf(acc) + 1}</span>`;
   }
-  return `<span class="tile ${size}" style="--c:${p.color}" aria-hidden="true">${esc(p.short)}${num}</span>`;
+  return `<span class="tile ${size}" style="--c:${p.color};${p.ink ? `color:${p.ink}` : ''}" aria-hidden="true">${esc(p.short)}${num}</span>`;
 }
 export function tileForPlatform(pid, size = '') {
   const p = S.platforms[pid];
-  return `<span class="tile ${size}" style="--c:${p.color}" aria-hidden="true">${esc(p.short)}</span>`;
+  return `<span class="tile ${size}" style="--c:${p.color};${p.ink ? `color:${p.ink}` : ''}" aria-hidden="true">${esc(p.short)}</span>`;
 }
 export function tilesFor(post, size = 'sm', max = 4) {
   const accs = post.targets.map(t => account(t.accountId)).filter(Boolean);
@@ -97,3 +117,18 @@ export function hasBot(accId) {
 }
 
 export function emptyIcon(name) { return `<span class="faint">${icon(name, 22)}</span>`; }
+
+/** One plain sentence describing the auto-update status. */
+export function updateLine(u) {
+  if (!u) return '';
+  switch (u.status) {
+    case 'unavailable': return 'Pembaruan otomatis aktif di versi yang sudah dipasang.';
+    case 'checking': return 'Memeriksa versi terbaru…';
+    case 'latest': return 'Serambi sudah versi terbaru.';
+    case 'available': return u.mode === 'manual' ? `Versi ${u.version} tersedia untuk diunduh.` : `Versi ${u.version} tersedia.`;
+    case 'downloading': return `Mengunduh versi ${u.version}… ${u.progress || 0}%`;
+    case 'downloaded': return `Versi ${u.version} siap dipasang. Terpasang otomatis saat Serambi ditutup.`;
+    case 'error': return u.error || 'Gagal memeriksa pembaruan.';
+    default: return 'Belum diperiksa.';
+  }
+}

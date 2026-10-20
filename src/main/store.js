@@ -1,3 +1,5 @@
+// Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
+//
 // Simple JSON store kept in the user's app-data folder.
 const fs = require('fs');
 const path = require('path');
@@ -6,7 +8,7 @@ const { app, safeStorage } = require('electron');
 
 const DEFAULTS = {
   version: 1,
-  accounts: [],      // { id, platform, name, muted, createdAt }
+  accounts: [],      // { id, platform, name, muted, createdAt, homeUrl?, shopUrl?, bookmarks? }
   posts: [],         // { id, text, media:[{id,file,type,name}], targets:[{accountId,status,error,doneAt}], status, scheduledAt, createdAt, updatedAt, postedAt }
   templates: [],     // { id, name, text }
   bots: {},          // accountId -> { tokenEnc, tokenPlain, chatId, chatTitle, botName }
@@ -17,6 +19,7 @@ const DEFAULTS = {
     launchAtLogin: false,
     preloadAccounts: true,    // load every account at start so chats and badges stay live
     sidebarCollapsed: false,
+    autoUpdate: true,         // Windows: download and install new versions automatically
     trayHintShown: false,
     window: null
   }

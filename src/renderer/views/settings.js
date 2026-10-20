@@ -1,12 +1,14 @@
+// Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
+//
 // Pengaturan — appearance, background behaviour, accounts, Telegram bots, templates, backup.
 import { icon } from '../icons.js';
 import { esc, toast, confirmDialog, promptDialog, openModal, snippet } from '../util.js';
-import { S, api, go, emit, account, platformOf, tile, modKey } from '../ctx.js';
+import { S, api, go, emit, account, platformOf, tile, modKey, KIND_LABEL, kindOf, orderedAccounts, updateLine } from '../ctx.js';
 
 let root, scrollTo;
 
 function toggle(key, label, desc) {
-  const on = !!S.state.settings[key];
+  const on = key === 'autoUpdate' ? S.state.settings[key] !== false : !!S.state.settings[key];
   return `
     <label class="set-row" style="cursor:pointer">
       <div class="meta"><b>${label}</b><span>${desc}</span></div>
@@ -37,6 +39,32 @@ function botForm(a) {
     </div>`;
 }
 
+function updateSection() {
+  const u = S.update || { status: 'unavailable', mode: 'none' };
+  const busy = u.status === 'checking' || u.status === 'downloading';
+  let action = `<button class="btn sm" data-upd-check ${busy || u.status === 'unavailable' ? 'disabled' : ''}>${icon('refresh-cw', 15)}Periksa sekarang</button>`;
+  if (u.status === 'downloaded') action = `<button class="btn primary sm" data-upd-install>${icon('rotate-cw', 15)}Mulai ulang & perbarui</button>`;
+  else if (u.status === 'available' && u.mode === 'manual') action = `<button class="btn primary sm" data-upd-download>${icon('download', 15)}Unduh versi ${esc(u.version)}</button>`;
+  else if (u.status === 'available') action = `<button class="btn primary sm" data-upd-download>${icon('download', 15)}Unduh pembaruan</button>`;
+  const when = u.checkedAt ? ` Terakhir diperiksa ${new Date(u.checkedAt).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.` : '';
+  return `
+      <section class="settings-group" id="sec-update">
+        <h2>Pembaruan</h2>
+        <p>${u.mode === 'manual'
+          ? 'Serambi memeriksa versi baru secara otomatis. Di Mac, unduh versi barunya lalu ganti aplikasi lama di folder Applications.'
+          : 'Serambi memeriksa versi baru secara otomatis dan memasangnya saat aplikasi ditutup.'}</p>
+        <div class="set-list">
+          <div class="set-row">
+            <span class="upd-icon ${u.status}">${icon(u.status === 'downloaded' || u.status === 'available' ? 'circle-arrow-down' : u.status === 'error' ? 'circle-alert' : 'circle-check-big', 20)}</span>
+            <div class="meta"><b>Serambi ${esc(S.version)}</b><span data-upd-line>${esc(updateLine(u))}${u.status === 'latest' || u.status === 'error' ? esc(when) : ''}</span>
+              ${u.status === 'downloading' ? `<span class="upd-bar"><span style="width:${u.progress || 0}%"></span></span>` : ''}</div>
+            <div class="acts">${action}</div>
+          </div>
+          ${u.mode === 'auto' ? toggle('autoUpdate', 'Unduh dan pasang pembaruan otomatis', 'Kalau dimatikan, Serambi hanya memberi tahu dan kamu memilih kapan mengunduh.') : ''}
+        </div>
+      </section>`;
+}
+
 function render() {
   const { settings, accounts, templates } = S.state;
   const tgs = accounts.filter(a => a.platform === 'telegram');
@@ -65,13 +93,15 @@ function render() {
 
       <section class="settings-group">
         <h2>Akun</h2>
-        <p>Urutkan akun dengan menarik di panel kiri. ${mk}+1 sampai ${mk}+9 membuka akun sesuai urutannya.</p>
+        <p>Urutkan akun dengan menarik di panel kiri. ${mk}+1 sampai ${mk}+9 membuka akun sesuai urutan di panel kiri.</p>
         <div class="set-list">
-          ${accounts.length ? accounts.map((a, i) => `
+          ${accounts.length ? orderedAccounts().map((a, i) => `
             <div class="set-row">
               ${tile(a, '', true)}
-              <div class="meta"><b>${esc(a.name)}</b><span>${esc(platformOf(a).name)}${i < 9 ? ` · ${mk}+${i + 1}` : ''}${a.muted ? ' · notifikasi mati' : ''}</span></div>
+              <div class="meta"><b>${esc(a.name)}</b><span>${esc(platformOf(a).name)}${i < 9 ? ` · ${mk}+${i + 1}` : ''}${a.muted ? ' · notifikasi mati' : ''}</span>
+                ${kindOf(a) === 'shop' ? `<span class="shop-link">${a.shopUrl ? `${icon('link', 13, 'inline')}${esc(a.shopUrl)}` : 'Link toko belum diatur'}</span>` : ''}</div>
               <div class="acts">
+                ${kindOf(a) === 'shop' ? `<button class="icon-btn" data-shop="${a.id}" title="${a.shopUrl ? 'Ubah link toko' : 'Atur link toko'}">${icon('link', 16)}</button>` : ''}
                 <button class="icon-btn" data-rename="${a.id}" title="Ganti nama">${icon('pencil', 16)}</button>
                 <button class="icon-btn" data-mute="${a.id}" title="${a.muted ? 'Nyalakan notifikasi' : 'Matikan notifikasi'}">${icon(a.muted ? 'bell-off' : 'bell', 16)}</button>
                 <button class="icon-btn" data-open="${a.id}" title="Buka">${icon('arrow-right', 16)}</button>
@@ -110,6 +140,8 @@ function render() {
         </div>
       </section>
 
+      ${updateSection()}
+
       <section class="settings-group">
         <h2>Cadangan</h2>
         <p>Simpan daftar akun, postingan, dan templat ke satu berkas. Login dan token bot tidak ikut tersimpan.</p>
@@ -133,7 +165,12 @@ function render() {
         </div></div>
       </section>
 
-      <p class="hint">Serambi ${esc(S.version)}. Semua data tersimpan di komputer ini.</p>
+      <div class="owner-foot">
+        <span>${icon('copyright', 15)}</span>
+        <div><b>${esc(S.owner.copyright)}</b>
+          <span>Serambi ${esc(S.version)} · Pemilik dan pengembang: ${esc(S.owner.name)} · <button class="link" data-mail>${esc(S.owner.email)}</button> · <button class="link" data-about>Tentang Serambi</button></span>
+          <span>Semua data tersimpan di komputer ini.</span></div>
+      </div>
     </div>`;
 }
 
@@ -169,6 +206,12 @@ async function onClick(e) {
   }
   if (ds.mute) { const a = account(ds.mute); return api.updateAccount({ id: a.id, patch: { muted: !a.muted } }); }
   if (ds.open) return go({ name: 'account', id: ds.open });
+  if (ds.shop) return emit('edit-shop', ds.shop);
+  if ('mail' in ds) return api.openMail();
+  if ('about' in ds) return emit('about');
+  if ('updCheck' in ds) return api.checkUpdate();
+  if ('updDownload' in ds) return api.downloadUpdate();
+  if ('updInstall' in ds) return api.installUpdate();
   if ('add' in ds) return emit('add-account');
   if ('addTg' in ds) return emit('add-account', 'telegram');
   if (ds.botSave) {
@@ -221,6 +264,7 @@ export default {
     root.addEventListener('change', onChange);
     render();
     scrollTo = route.section;
+    if (scrollTo === 'update' && S.update && S.update.status !== 'unavailable') api.checkUpdate();
     if (scrollTo) setTimeout(() => root.querySelector('#sec-' + scrollTo)?.scrollIntoView({ block: 'start' }), 30);
   },
   update() {
@@ -234,6 +278,13 @@ export default {
       if (f) { f.querySelector('[data-token]').value = v.token; if (v.chat) f.querySelector('[data-chat]').value = v.chat; }
     }
     root.scrollTop = y;
+  },
+  onUpdate() {
+    const sec = root.querySelector('#sec-update');
+    if (!sec) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = updateSection();
+    sec.replaceWith(tmp.firstElementChild);
   },
   unmount() {
     root.removeEventListener('click', onClick);

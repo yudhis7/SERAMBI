@@ -1,3 +1,5 @@
+// Serambi — Copyright (c) 2026 Yudhistira <yudhie7@gmail.com>. All rights reserved.
+//
 // Jadwal — month calendar with a day panel, or a filtered list.
 import { icon } from '../icons.js';
 import {
