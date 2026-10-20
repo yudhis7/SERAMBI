@@ -44,10 +44,15 @@ jobs:
           todo='[]'
           for row in $(jq -c '.[]' <<< "$list"); do
             v=$(jq -r .version <<< "$row")
-            if gh release view "v$v" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-              echo "v$v sudah punya Release, dilewati."
+            latest=$(jq -r .latest <<< "$row")
+            assets=$(gh release view "v$v" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets | length' 2>/dev/null || echo none)
+            if [ "$assets" != "none" ] && [ "$assets" != "0" ]; then
+              echo "v$v sudah punya Release lengkap, dilewati."
+            elif [ "$latest" != "true" ] && ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$v" > /dev/null 2>&1; then
+              # GitHub tidak mengizinkan workflow membuat tag di commit lama.
+              echo "::notice title=Tag v$v belum ada::Terbitkan Release v$v lewat halaman Releases (target: commit Serambi $v). Installer akan dilampirkan otomatis."
             else
-              echo "v$v akan diterbitkan."
+              echo "v$v akan dibangun dan diterbitkan."
               todo=$(jq -c --argjson r "$row" '. + [$r]' <<< "$todo")
             fi
           done
