@@ -118,7 +118,18 @@ jobs:
         run: |
           f=".github/release-notes/v${{ matrix.rel.version }}.md"
           if [ -f "$f" ]; then cp "$f" notes.md; else echo "Serambi ${{ matrix.rel.version }}" > notes.md; fi
+      - name: Cek Release yang sudah ada
+        id: ada
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ matrix.rel.version }}" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "ada=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ada=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Buat tag v${{ matrix.rel.version }}
+        if: steps.ada.outputs.ada != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -132,7 +143,19 @@ jobs:
             exit 1
           fi
           echo "Tag $tag dibuat."
-      - uses: softprops/action-gh-release@v2
+      - name: Lampirkan installer ke Release yang sudah ada
+        if: steps.ada.outputs.ada == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "v${{ matrix.rel.version }}" out/* --clobber -R "$GITHUB_REPOSITORY"
+          body=$(gh release view "v${{ matrix.rel.version }}" -R "$GITHUB_REPOSITORY" --json body --jq .body)
+          if [ -z "$body" ]; then
+            gh release edit "v${{ matrix.rel.version }}" --notes-file notes.md -R "$GITHUB_REPOSITORY" \
+              || echo "::warning::Catatan rilis tidak bisa diisi otomatis. Isi lewat halaman Releases."
+          fi
+      - if: steps.ada.outputs.ada != 'true'
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ matrix.rel.version }}
           target_commitish: ${{ matrix.rel.sha }}
