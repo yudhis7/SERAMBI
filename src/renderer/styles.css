@@ -177,7 +177,9 @@ button { cursor: pointer; }
 }
 .os-darwin .sb-top { padding-left: 86px; }
 .brand { display: flex; align-items: center; gap: 9px; font-weight: 750; font-size: 15px; letter-spacing: -.01em; }
-.brand-mark { width: 22px; height: 22px; flex: none; }
+.brand-mark { width: 24px; height: 24px; flex: none; display: block; -webkit-user-drag: none; }
+.brand-text { display: flex; align-items: center; }
+.brand-word { height: 15px; width: auto; display: block; -webkit-user-drag: none; }
 .sb-top .grow { flex: 1; }
 .sb-icon-btn {
   -webkit-app-region: no-drag;
@@ -785,8 +787,9 @@ button { cursor: pointer; }
 
 /* about */
 .about { display: flex; align-items: center; gap: 14px; }
-.about-mark { width: 56px; height: 56px; border-radius: 16px; background: var(--sb-bg); display: grid; place-items: center; flex: none; }
-.about-mark .brand-mark { width: 32px; height: 32px; }
+.about-mark { width: 56px; height: 56px; display: grid; place-items: center; flex: none; }
+.about-mark .brand-mark { width: 56px; height: 56px; filter: drop-shadow(0 4px 10px rgba(20, 60, 140, .25)); }
+.about-banner { display: block; width: 100%; aspect-ratio: 960 / 524; object-fit: cover; border-radius: 14px; margin: 0 0 16px; background: #05070B; }
 .about-name { display: block; font-size: 20px; font-weight: 750; letter-spacing: -.01em; }
 .about-ver { display: block; font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .about-owner { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line-2); }

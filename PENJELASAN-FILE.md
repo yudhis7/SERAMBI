@@ -49,10 +49,12 @@ Serambi-source/
 ├── .github/workflows/build.yml  build Windows + Mac dan terbitkan GitHub Release
 ├── scripts/
 │   ├── gen-icons.js             membuat src/renderer/icons.js dari Lucide
-│   └── gen-assets.js            membuat ikon aplikasi, tray, badge (PNG)
+│   └── gen-assets.js            membuat semua berkas logo dari branding/serambi-logo.png
 ├── tools/
 │   └── terbitkan-lisensi.js     alat terminal pemilik untuk menerbitkan kunci lisensi
-├── build/                       ikon installer + license.txt (halaman lisensi installer)
+├── branding/
+│   └── serambi-logo.png         logo induk Serambi (sumber semua ikon)
+├── build/                       ikon installer, gambar samping installer, license.txt
 ├── assets/                      ikon jendela, tray, dan badge notifikasi
 └── src/
     ├── main/                    PROSES UTAMA
@@ -202,7 +204,8 @@ Tema, notifikasi & perilaku latar, daftar akun, formulir bot Telegram (dengan te
 ## scripts, build, assets
 
 - `scripts/gen-icons.js` mengambil ikon yang dipakai dari paket `lucide-static`.
-- `scripts/gen-assets.js` menggambar ikon aplikasi (atap serambi + gelembung chat) dalam SVG, lalu mengubahnya ke PNG berbagai ukuran dengan `sharp`. Ikon tray Mac dibuat sebagai *template image* hitam agar menyesuaikan menu bar.
+- `branding/serambi-logo.png` adalah logo induk Serambi (tanda rantai "S" bercahaya, tulisan SERAMBI, dan slogan *Unify Social, Empower Commerce*).
+- `scripts/gen-assets.js` membuat semua berkas logo dari logo induk dengan `sharp`: tanda diambil dari latar gelapnya lalu ditempatkan di ubin gelap membulat (ikon Mac, Windows, jendela, tray), *template image* hitam untuk menu bar Mac, tanda dan tulisan SERAMBI untuk bilah samping (`src/renderer/img/`), banner jendela Tentang, gambar samping installer Windows (`build/installerSidebar.bmp`), dan tanda kecil untuk PDF (`src/renderer/lib/logo-data.js`). Jalankan ulang setelah logo induk diganti.
 - `build/icon.png` (1024 px) diubah otomatis menjadi `.icns` (Mac), dan `build/icon-win.png` menjadi `.ico` (Windows).
 
 ## package.json — bagian `build`
