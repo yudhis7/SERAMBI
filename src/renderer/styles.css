@@ -864,6 +864,7 @@ code.link-code { display: block; font-size: 11.5px; padding: 8px 10px; border-ra
 .sb-tag { font-size: 10px; font-weight: 750; padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,.1); color: var(--sb-ink-2); letter-spacing: .02em; }
 .sb-plan { color: #FFD27A; }
 .sb-plan.solo { color: var(--sb-ink-2); }
+.sb-plan.demo { color: #7FE0C2; }
 .sb-plan .sb-sub { display: block; font-size: 11px; color: var(--sb-ink-2); font-weight: 500; line-height: 1.1; }
 .sb-plan .label { line-height: 1.2; }
 .collapsed .sb-tag, .collapsed .sb-plan .sb-sub { display: none; }
@@ -1258,6 +1259,13 @@ label.pick-row input { accent-color: var(--primary); width: 16px; height: 16px; 
 .plan-banner { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; background: var(--violet-soft); color: var(--violet); font-size: 13px; margin: 12px 0 0; }
 .plan-banner span { flex: 1; }
 .plan-banner.warn { background: var(--warn-soft); color: var(--warn-text); }
+.plan-banner.demo { background: var(--primary-soft); color: var(--primary-text); }
+.plan-ic.demo { background: var(--primary-soft); color: var(--primary-text); }
+.check-inline.full { grid-column: 1 / -1; flex-wrap: nowrap; align-items: flex-start; }
+.check-inline.full input { margin-top: 2px; flex: none; }
+.demo-spin { width: 34px; height: 34px; margin: 18px auto 4px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--primary); animation: demo-spin .9s linear infinite; }
+@keyframes demo-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .demo-spin { animation-duration: 3s; } }
 .review-box { border-color: var(--primary-line); background: var(--primary-soft); }
 .review-box .section-head h2 { color: var(--primary-text); }
 .task-list { overflow: hidden; }

@@ -89,8 +89,11 @@ function renderSidebar() {
     </div>
     <div class="sb-bottom">
       ${updatePill}
-      <button class="sb-item sb-plan ${pl.id || ''}" data-go-plan title="Paket ${esc(pl.name || '')}${pl.source === 'trial' ? ` · uji coba ${pl.daysLeft} hari lagi` : ''}">
-        ${icon('crown', 19)}<span class="label">${esc(pl.name || '')}${pl.source === 'trial' ? ` <span class="sb-sub">uji coba · ${pl.daysLeft} hari</span>` : ''}</span></button>
+      ${S.state.demo && S.state.demo.active
+        ? `<button class="sb-item sb-plan demo" data-go-plan title="Mode demo · data contoh ${esc(S.state.business.name || '')}">
+        ${icon('presentation', 19)}<span class="label">Mode demo <span class="sb-sub">data contoh · ${esc(pl.name || '')}</span></span></button>`
+        : `<button class="sb-item sb-plan ${pl.id || ''}" data-go-plan title="Paket ${esc(pl.name || '')}${pl.source === 'trial' ? ` · uji coba ${pl.daysLeft} hari lagi` : ''}">
+        ${icon('crown', 19)}<span class="label">${esc(pl.name || '')}${pl.source === 'trial' ? ` <span class="sb-sub">uji coba · ${pl.daysLeft} hari</span>` : ''}</span></button>`}
       ${nav('usecases', 'lightbulb', 'Contoh penggunaan')}
       ${nav('trust', 'shield-check', 'Pusat Kepercayaan', trustOpen ? `<span class="sb-count">${trustOpen}</span>` : '')}
       ${nav('settings', 'settings', 'Pengaturan')}
@@ -810,6 +813,19 @@ let lockWait = 0;
 function renderLock() {
   const root = $('#lock-root');
   const st = S.state;
+  if (st.demo && st.demo.seeding) {
+    document.body.classList.add('locked');
+    if (root.dataset.mode === 'demo-seed') return;
+    root.dataset.mode = 'demo-seed';
+    root.innerHTML = `<div class="lock-screen"><div class="lock-card">
+      <div class="about-mark">${BRAND_MARK}</div>
+      <h2>Menyiapkan mode demo</h2>
+      <p>Serambi sedang mengisi usaha contoh lengkap: akun, jadwal, tim, iklan, ulasan, pelanggan, dan Pusat Kepercayaan. Data aslimu tidak disentuh.</p>
+      <div class="demo-spin" aria-hidden="true"></div>
+    </div></div>`;
+    return;
+  }
+  if (root.dataset.mode === 'demo-seed') { root.innerHTML = ''; delete root.dataset.mode; document.body.classList.remove('locked'); }
   if (st.storeBlocked) {
     document.body.classList.add('locked');
     if (root.dataset.mode === 'blocked') return;

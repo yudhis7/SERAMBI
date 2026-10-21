@@ -50,14 +50,15 @@ function parseLicense(key) {
   const lic = {
     key: text, id: String(p.id || ''), plan: p.plan, seats,
     name: String(p.name || ''), email: String(p.email || ''),
-    issuedAt: Number(p.iat) || 0, expiresAt: p.exp ? Number(p.exp) : null
+    issuedAt: Number(p.iat) || 0, expiresAt: p.exp ? Number(p.exp) : null,
+    demo: p.demo === true // owner's demo licence: also unlocks Mode demo
   };
   lic.expired = !!(lic.expiresAt && Date.now() > lic.expiresAt);
   return { ok: true, license: lic };
 }
 
 /** Signs a new licence key. Used by the owner's licence tool; the private key never leaves memory. */
-function issueLicense(privatePem, { plan, seats, name, email, months }) {
+function issueLicense(privatePem, { plan, seats, name, email, months, demo }) {
   if (!PLANS[plan] || plan === 'solo') throw new Error('Pilih paket SMALPreneur atau MediumPreneur.');
   const key = crypto.createPrivateKey(privatePem);
   // Make sure the private key belongs to the public key built into this version of Serambi.
@@ -69,7 +70,8 @@ function issueLicense(privatePem, { plan, seats, name, email, months }) {
     v: 1, id: crypto.randomBytes(6).toString('hex'), plan,
     seats: Math.min(p.seatsMax, Math.max(1, Number(seats) || p.seatsMax)),
     name: String(name || '').trim().slice(0, 80), email: String(email || '').trim().slice(0, 120),
-    iat: now, exp: Number(months) > 0 ? now + Math.round(Number(months) * 30.44 * DAY) : null
+    iat: now, exp: Number(months) > 0 ? now + Math.round(Number(months) * 30.44 * DAY) : null,
+    ...(demo ? { demo: true } : {})
   };
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const sig = crypto.sign(null, Buffer.from(body), key).toString('base64url');
@@ -100,7 +102,7 @@ function currentPlan({ license, trial }) {
   };
 }
 function publicLicense(l) {
-  return { id: l.id, plan: l.plan, planName: PLANS[l.plan].name, seats: l.seats, name: l.name, email: l.email, issuedAt: l.issuedAt, expiresAt: l.expiresAt, expired: l.expired };
+  return { id: l.id, plan: l.plan, planName: PLANS[l.plan].name, seats: l.seats, name: l.name, email: l.email, issuedAt: l.issuedAt, expiresAt: l.expiresAt, expired: l.expired, demo: !!l.demo };
 }
 
 module.exports = { PLANS, parseLicense, issueLicense, currentPlan };

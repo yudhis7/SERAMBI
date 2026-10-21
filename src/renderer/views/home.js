@@ -71,6 +71,8 @@ function taskRow(t) {
 
 function planBanner() {
   const pl = S.state.plan;
+  const dm = S.state.demo;
+  if (dm && dm.active) return `<div class="plan-banner demo">${icon('presentation', 16)}<span><b>Mode demo.</b> ${esc(S.state.business.name || 'Usaha contoh')} dan semua isinya fiktif. Data asli usahamu tersimpan terpisah dan tidak tersentuh.</span><button class="link" data-go-plan>Atur mode demo</button></div>`;
   if (pl.source === 'trial') return `<div class="plan-banner">${icon('rocket', 16)}<span>Uji coba <b>MediumPreneur</b>: ${pl.daysLeft} hari lagi. Semua fitur tim terbuka.</span><button class="link" data-go-plan>Lihat paket</button></div>`;
   if (pl.lapsed) return `<div class="plan-banner warn">${icon('triangle-alert', 16)}<span>${pl.lapsed === 'trial' ? 'Masa uji coba sudah berakhir' : 'Lisensi sudah habis'}. Serambi kembali ke paket SOLOPreneur${inTeam() ? '; data tim hanya bisa dilihat' : ''}.</span><button class="link" data-go-plan>Aktifkan lisensi</button></div>`;
   return '';

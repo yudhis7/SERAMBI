@@ -62,10 +62,12 @@ const uid = () => crypto.randomBytes(8).toString('hex');
 const ENC_FORMAT = 'serambi-local-enc';
 
 class Store {
-  constructor() {
+  /** profile 'main' is the user's real data; 'demo' is the owner's separate sales demo. */
+  constructor(profile = 'main') {
+    this.profile = profile === 'demo' ? 'demo' : 'main';
     this.dir = app.getPath('userData');
-    this.file = path.join(this.dir, 'serambi-data.json');
-    this.mediaDir = path.join(this.dir, 'media');
+    this.file = path.join(this.dir, this.profile === 'demo' ? 'serambi-demo.json' : 'serambi-data.json');
+    this.mediaDir = path.join(this.dir, this.profile === 'demo' ? 'media-demo' : 'media');
     fs.mkdirSync(this.mediaDir, { recursive: true });
     this.encrypted = false;
     this.blocked = null;     // set when the encrypted file cannot be opened on this device

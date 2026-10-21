@@ -50,6 +50,9 @@ contextBridge.exposeInMainWorld('serambi', {
   activateLicense: invoke('plan:activate'),
   removeLicense: invoke('plan:deactivate'),
   issueLicense: invoke('license:issue'),
+  enterDemo: invoke('demo:enter'),
+  exitDemo: invoke('demo:exit'),
+  resetDemo: invoke('demo:reset'),
   // team
   createTeam: invoke('team:create'),
   joinTeam: invoke('team:join'),

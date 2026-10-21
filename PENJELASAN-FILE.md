@@ -63,6 +63,7 @@ Serambi-source/
     │   ├── store.js             data (terenkripsi kunci sistem sejak 1.2)
     │   ├── telegram.js
     │   ├── plans.js             3 paket & kunci lisensi (1.2)
+    │   ├── demo.js              Mode demo: data usaha contoh untuk presentasi (1.2.1)
     │   ├── secure.js            kriptografi: AES-GCM, scrypt, X25519 (1.2)
     │   ├── workspace.js         ruang kerja tim di folder bersama (1.2)
     │   ├── access.js            peran & izin (1.2)
@@ -230,6 +231,7 @@ Tema, notifikasi & perilaku latar, daftar akun, formulir bot Telegram (dengan te
 | File | Isi |
 | --- | --- |
 | `plans.js` | Definisi **SOLOPreneur / SMALPreneur / MediumPreneur** (kursi, lokasi, otomatisasi, fitur). `parseLicense()` memeriksa kunci `SRB1.<data>.<tanda tangan>` dengan `crypto.verify` Ed25519 terhadap kunci publik di `config.js`. `issueLicense()` menandatangani kunci baru (dipakai menu Bantuan dan `tools/terbitkan-lisensi.js`). `currentPlan()` menentukan paket aktif dari lisensi, uji coba 14 hari, atau gratis. |
+| `demo.js` | **Mode demo** untuk presentasi penjualan pemilik Serambi. `readProfile()`/`writeProfile()` mencatat profil data aktif di `serambi-profile.json`. `seed()` mengisi profil demo yang terpisah (`serambi-demo.json`, `media-demo`, ruang kerja lokal `demo-ruang-kerja`) dengan usaha fiktif *Kopi Senja*: akun, postingan bergambar, tim, kampanye, ulasan, pelanggan, otomatisasi, Pusat Kepercayaan, dan log audit berurutan waktu. Hanya terbuka dengan lisensi bertanda `demo`; pemilihan profil ada di `openStore()` di `main.js`. |
 | `secure.js` | Semua kriptografi bawaan Node: AES-256-GCM dengan data terkait (AAD), scrypt untuk PIN dan cadangan berkata sandi, *sealed box* X25519 + HKDF untuk membagikan kunci tim ke satu perangkat, kode base32 bergrup (kode undangan/pemulihan), dan `safeStorage` untuk rahasia di komputer. |
 | `store.js` | Sejak 1.2 seluruh berkas data dienkripsi dengan kunci sistem operasi (DPAPI/Keychain) bila tersedia. Bila berkas terenkripsi tidak bisa dibuka (izin Keychain ditolak, komputer lain), Serambi masuk mode **terblokir**: tidak menimpa apa pun, menawarkan *Coba lagi* atau *Mulai dengan data kosong*. |
 | `workspace.js` | **Ruang kerja tim tanpa server.** Tiap data disimpan sebagai berkas terenkripsi `data/<koleksi>/<id>.srb` di folder bersama. Sinkron: kirim perubahan (hash isi), tarik berkas yang berubah, konflik per data diselesaikan oleh perubahan terbaru, penghapusan memakai *tombstone*. Undangan sekali pakai, kode pemulihan pemilik, kehadiran perangkat, media terenkripsi, **ganti kunci** (semua berkas dienkripsi ulang) saat anggota dikeluarkan, dan penanda pencabutan untuk perangkat yang dikeluarkan. |

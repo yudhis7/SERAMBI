@@ -29,7 +29,8 @@ export const AUDIT_LABELS = {
   'workspace.create': 'Ruang kerja tim dibuat', 'workspace.join': 'Bergabung ke ruang kerja', 'workspace.recover': 'Akses pemilik dipulihkan', 'workspace.leave': 'Keluar dari ruang kerja', 'workspace.rotate': 'Kunci tim diganti',
   'member.invite': 'Anggota diundang', 'member.reinvite': 'Kode undangan baru', 'member.role': 'Peran anggota diubah', 'member.access': 'Akses data pelanggan diubah', 'member.remove': 'Anggota dikeluarkan',
   'team.approval': 'Aturan persetujuan diubah', 'team.access-review': 'Akses data ditinjau', 'post.approve': 'Postingan disetujui', 'post.reject': 'Postingan ditolak',
-  'license.activate': 'Lisensi diaktifkan', 'license.remove': 'Lisensi dilepas', 'trial.start': 'Uji coba dimulai', 'account.add': 'Akun ditambahkan', 'account.remove': 'Akun dihapus'
+  'license.activate': 'Lisensi diaktifkan', 'license.remove': 'Lisensi dilepas', 'trial.start': 'Uji coba dimulai', 'account.add': 'Akun ditambahkan', 'account.remove': 'Akun dihapus',
+  'demo.enter': 'Masuk mode demo'
 };
 
 const manage = () => perm('trust.manage');

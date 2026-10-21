@@ -99,13 +99,13 @@ function entryHash(e) {
   return S.sha256((e.prev || '') + S.stableStringify(rest));
 }
 
-function appendAudit(store, actor, { action, target = '', detail = '' }) {
+function appendAudit(store, actor, { action, target = '', detail = '', at }) {
   const list = store.data.audit;
   const device = (store.data.device && store.data.device.id) || 'local';
   let prev = '';
   for (let i = list.length - 1; i >= 0; i--) { if (list[i].device === device) { prev = list[i].hash; break; } }
   const e = {
-    id: uid(), at: Date.now(), actor: actor.id || 'local', actorName: actor.name || '', device,
+    id: uid(), at: Number(at) || Date.now(), actor: actor.id || 'local', actorName: actor.name || '', device,
     action: String(action), target: String(target || '').slice(0, 200), detail: String(detail || '').slice(0, 500), prev
   };
   e.hash = entryHash(e);

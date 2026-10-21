@@ -1,7 +1,7 @@
 {
   "name": "serambi",
   "productName": "Serambi",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Kelola media sosial dan toko online, tumbuh di pencarian lokal, ulasan, iklan, kerja tim, dan pelindungan data pelanggan, dari satu aplikasi.",
   "main": "src/main/main.js",
   "author": {

@@ -65,7 +65,7 @@ class Workspace {
     this.audit = audit;
     this.notify = notify;
     this.appVersion = appVersion;
-    this.syncFile = path.join(store.dir, 'serambi-sync.json');
+    this.syncFile = path.join(store.dir, store.profile === 'demo' ? 'serambi-sync-demo.json' : 'serambi-sync.json');
     this.sync = this._loadSync();
     this.keyCache = new Map();
     this.state = { status: 'off', error: '', lastSyncAt: 0, lastPushAt: 0 };

@@ -27,7 +27,9 @@ const names = [
   'link-2', 'messages-square', 'repeat', 'calendar-clock', 'clipboard-list', 'flag', 'bell-ring',
   'smartphone', 'laptop', 'pen-line', 'minus', 'circle-help', 'sprout', 'rocket', 'handshake',
   'washing-machine', 'clipboard-check', 'file-check', 'sparkle', 'user-check', 'user-round',
-  'log-in', 'layout-grid', 'copy-check'
+  'log-in', 'layout-grid', 'copy-check',
+  // v1.2.1: demo mode
+  'presentation'
 ];
 
 const dir = path.join(__dirname, '..', 'node_modules', 'lucide-static', 'icons');

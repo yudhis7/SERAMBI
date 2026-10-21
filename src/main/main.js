@@ -24,6 +24,7 @@ const growth = require('./growth');
 const { MOMENTS, MOMENT_KIND } = require('./moments');
 const S = require('./secure');
 const { registerDataIpc, CONSENT_PURPOSES } = require('./data-ipc');
+const demo = require('./demo');
 
 const isMac = process.platform === 'darwin';
 const isWin = process.platform === 'win32';
@@ -64,6 +65,9 @@ let updater = null;
 let workspace = null;
 let security = null;
 let issuerKeyPath = null; // licence tool: path of the owner's private key, kept for this session only
+let demoSeedKey = null;     // set when this start must build the demo data
+let demoSeeding = false;
+let demoError = '';
 const notifications = new Set();
 const running = new Set();
 const startedAt = Date.now();
@@ -150,6 +154,70 @@ function isAutomationDevice() {
   return set ? set === devId : me().role === 'owner';
 }
 
+// ---------- Mode demo (owner's sales demo, separate data profile) ----------
+function demoKeyOk(key) {
+  if (!key) return false;
+  const r = parseLicense(key);
+  return !!(r.ok && r.license.demo && !r.license.expired);
+}
+/**
+ * The demo licence that unlocks Mode demo on this computer, if any.
+ * Only the licence activated on this device counts, so team members never get Mode demo
+ * from a team whose owner uses a demo licence.
+ */
+function demoLicenseKey() {
+  const k = store.data.settings.license;
+  return demoKeyOk(k) ? k : null;
+}
+function wipeDemoFiles(dir) {
+  for (const f of ['serambi-demo.json', 'serambi-demo.json.tmp', 'serambi-sync-demo.json']) { try { fs.rmSync(path.join(dir, f), { force: true }); } catch (_) {} }
+  for (const f of ['media-demo', demo.demoTeamDir(dir).split(path.sep).pop()]) { try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }); } catch (_) {} }
+}
+/** Chooses the data profile for this start. Mode demo opens only with a valid demo licence. */
+function openStore() {
+  const dir = app.getPath('userData');
+  const prof = demo.readProfile(dir);
+  if (prof.active !== 'demo') return new Store('main');
+  const pending = demoKeyOk(prof.key) ? prof.key : null;
+  let s = new Store('demo');
+  const own = !s.blocked && demoKeyOk(s.data.settings.license) ? s.data.settings.license : null;
+  const key = pending || own;
+  if (!key) { demo.writeProfile(dir, { active: 'main' }); return new Store('main'); }
+  if (s.blocked || !(s.data.demo && s.data.demo.seededAt)) {
+    wipeDemoFiles(dir);
+    s = new Store('demo');
+    Object.assign(s.data.settings, { license: key, seenVersion: '1.2', preloadAccounts: false, welcomeSeen: true });
+    demoSeedKey = key;
+  }
+  if (prof.key) demo.writeProfile(dir, { active: 'demo' }); // the key does not stay in the plain profile file
+  return s;
+}
+function relaunch() {
+  quitting = true;
+  try { if (workspace) workspace.stop(); } catch (_) {}
+  try { if (store) store.save(true); } catch (_) {}
+  app.relaunch({ args: process.argv.slice(1).filter(a => a !== '--hidden') });
+  app.exit(0);
+}
+async function runDemoSeed(key) {
+  demoSeeding = true; demoError = '';
+  broadcast();
+  try {
+    const r = parseLicense(key);
+    await demo.seed({
+      store, workspace, appendAudit, uid, licenseKey: key,
+      ownerName: (r.ok && r.license.name) || 'Pemilik', ownerEmail: (r.ok && r.license.email) || '',
+      fontDir: path.join(RENDERER, 'fonts'), runAutomations: () => automationTick()
+    });
+    for (const a of store.data.accounts) setupAccountSession(a);
+  } catch (e) {
+    demoError = (e && e.message) || String(e);
+    console.error('demo seed', e);
+  }
+  demoSeeding = false;
+  broadcast(); refreshTray();
+}
+
 // ---------- what the window may see ----------
 let auditCache = { key: '', result: null };
 function auditStatus() {
@@ -223,7 +291,8 @@ function publicState() {
     },
     compliance: privacy.compliance(d, { lockOn: !!(d.settings.security.lock && d.settings.security.pin), encOn: store.encrypted }),
     locked,
-    storeBlocked: store.blocked ? { reason: store.blocked.reason } : null
+    storeBlocked: store.blocked ? { reason: store.blocked.reason } : null,
+    demo: { active: store.profile === 'demo', available: store.profile === 'demo' || !!demoLicenseKey(), seeding: demoSeeding, error: demoError, seededAt: d.demo ? d.demo.seededAt : null }
   };
 }
 
@@ -1158,6 +1227,37 @@ function registerIpc() {
     }
   });
 
+  // ---- Mode demo ----
+  h('demo:enter', () => {
+    if (store.profile === 'demo') return { ok: true };
+    if (security.locked) throw new Error('Serambi sedang terkunci.');
+    const key = demoLicenseKey();
+    if (!key) return { ok: false, error: 'Mode demo hanya terbuka dengan lisensi demo dari pemilik Serambi.' };
+    audit({ action: 'demo.enter', detail: 'Pindah ke data demo; data asli tidak diubah' });
+    demo.writeProfile(store.dir, { active: 'demo', key });
+    setTimeout(relaunch, 150);
+    return { ok: true };
+  });
+  h('demo:exit', () => {
+    if (store.profile !== 'demo') return { ok: true };
+    demo.writeProfile(store.dir, { active: 'main' });
+    setTimeout(relaunch, 150);
+    return { ok: true };
+  });
+  h('demo:reset', async () => {
+    if (store.profile !== 'demo') throw new Error('Hanya bisa di mode demo.');
+    const key = store.data.settings.license;
+    if (!demoKeyOk(key)) throw new Error('Lisensi demo tidak ditemukan.');
+    for (const a of store.data.accounts) await clearAccountSession(a.id);
+    try { workspace.stop(); } catch (_) {}
+    clearTimeout(store._timer);
+    store.save = () => {}; // nothing may write the demo file again before the restart
+    wipeDemoFiles(store.dir);
+    demo.writeProfile(store.dir, { active: 'demo', key });
+    setTimeout(() => { quitting = true; app.relaunch({ args: process.argv.slice(1).filter(a => a !== '--hidden') }); app.exit(0); }, 150);
+    return { ok: true };
+  });
+
   // ---- team workspace ----
   h('team:create', async ({ name, ownerName, ownerEmail }) => {
     if (!plan().team) throw new Error('Kerja tim tersedia di paket SMALPreneur dan MediumPreneur. Mulai uji coba 14 hari atau aktifkan lisensi.');
@@ -1348,7 +1448,7 @@ function registerProtocol() {
 app.on('second-instance', () => showWindow());
 
 app.whenReady().then(() => {
-  store = new Store();
+  store = openStore();
   nativeTheme.themeSource = ['light', 'dark'].includes(store.data.settings.theme) ? store.data.settings.theme : 'system';
   nativeTheme.on('updated', () => {
     if (win && !isMac) { try { win.setTitleBarOverlay(overlayColors()); } catch (_) {} }
@@ -1395,6 +1495,7 @@ app.whenReady().then(() => {
   try { createTray(); } catch (_) {}
   cleanupMedia();
   if (workspace.linked) workspace.start();
+  if (demoSeedKey) runDemoSeed(demoSeedKey);
   setTimeout(tick, 4000);
   setInterval(tick, 15000);
   setTimeout(automationTick, 12000);

@@ -67,12 +67,40 @@ function updateSection() {
       </section>`;
 }
 
+const demoActive = () => !!(S.state.demo && S.state.demo.active);
+function demoRow() {
+  const dm = S.state.demo || {};
+  if (dm.active) return `
+          <div class="set-row demo-row"><span class="plan-ic demo">${icon('presentation', 20)}</span>
+            <div class="meta"><b>Mode demo aktif</b><span>Semua isi di sini fiktif (${esc(S.state.business.name || 'usaha contoh')}). Data asli usahamu tersimpan terpisah dan kembali saat kamu keluar.${dm.error ? ` <span class="err">Sebagian data demo gagal dibuat: ${esc(dm.error)}</span>` : ''}</span></div>
+            <div class="acts"><button class="btn sm" data-demo-reset>${icon('refresh-ccw', 15)}Atur ulang</button><button class="btn primary sm" data-demo-exit>${icon('log-out', 15)}Keluar mode demo</button></div></div>`;
+  if (dm.available) return `
+          <div class="set-row demo-row"><span class="plan-ic demo">${icon('presentation', 20)}</span>
+            <div class="meta"><b>Mode demo</b><span>Ruang terpisah berisi usaha contoh lengkap untuk presentasi ke calon pelanggan. Semua fitur terbuka, data aslimu tidak tersentuh.</span></div>
+            <div class="acts"><button class="btn primary sm" data-demo-enter>${icon('presentation', 15)}Masuk mode demo</button></div></div>`;
+  return '';
+}
+async function demoAction(kind) {
+  if (kind === 'enter') {
+    if (!await confirmDialog({ title: 'Masuk mode demo?', message: 'Serambi akan dibuka ulang dengan data contoh “Kopi Senja”. Data asli usahamu disimpan terpisah dan tidak berubah. Keluar kapan saja dari Pengaturan → Paket & lisensi.', confirm: 'Masuk mode demo' })) return;
+    const r = await api.enterDemo();
+    if (r && r.ok === false) toast(r.error, { kind: 'err', ms: 6000 });
+    else toast('Membuka mode demo…', { kind: 'info' });
+  } else if (kind === 'exit') {
+    if (!await confirmDialog({ title: 'Keluar dari mode demo?', message: 'Serambi dibuka ulang dengan data asli usahamu. Data demo tetap tersimpan untuk presentasi berikutnya.', confirm: 'Keluar mode demo' })) return;
+    await api.exitDemo();
+  } else if (kind === 'reset') {
+    if (!await confirmDialog({ title: 'Atur ulang data demo?', message: 'Semua perubahan di mode demo dihapus dan data contoh dibuat ulang dengan tanggal terbaru. Login akun yang kamu buka di mode demo juga dikeluarkan. Data asli tidak tersentuh.', confirm: 'Atur ulang', danger: true })) return;
+    await api.resetDemo();
+  }
+}
+
 function planSection() {
   const pl = S.state.plan;
   const lic = pl.license;
   const owner = S.state.me.role === 'owner';
-  const src = pl.source === 'license' ? `Lisensi untuk <b>${esc(lic.name || '—')}</b>${lic.email ? ` (${esc(lic.email)})` : ''} · ${lic.seats} pengguna · ${lic.expiresAt ? 'berlaku sampai ' + esc(fmtDateLong(lic.expiresAt)) : 'tanpa batas waktu'}`
-    : pl.source === 'trial' ? `Uji coba MediumPreneur, <b>${pl.daysLeft} hari lagi</b> (sampai ${esc(fmtDateLong(pl.trialEndsAt))})`
+  const src = pl.source === 'license' ? `Lisensi untuk <strong>${esc(lic.name || '—')}</strong>${lic.email ? ` (${esc(lic.email)})` : ''} · ${lic.seats} pengguna · ${lic.expiresAt ? 'berlaku sampai ' + esc(fmtDateLong(lic.expiresAt)) : 'tanpa batas waktu'}`
+    : pl.source === 'trial' ? `Uji coba MediumPreneur, <strong>${pl.daysLeft} hari lagi</strong> (sampai ${esc(fmtDateLong(pl.trialEndsAt))})`
     : pl.lapsed === 'license' ? 'Lisensi sudah habis. Kembali ke paket gratis.' : pl.lapsed === 'trial' ? 'Masa uji coba sudah berakhir.' : 'Gratis untuk satu pengguna, tanpa batas waktu.';
   return `
       <section class="settings-group" id="sec-plan">
@@ -83,9 +111,10 @@ function planSection() {
             <div class="meta"><b>${esc(pl.name)}</b><span>${src}</span></div>
             <div class="acts">
               ${(!inTeam() || owner) && pl.source === 'free' && !pl.trialUsed ? `<button class="btn sm" data-trial>${icon('rocket', 15)}Coba ${S.trialDays} hari</button>` : ''}
-              ${(!inTeam() || owner) ? `<button class="btn primary sm" data-activate>${icon('key-round', 15)}${pl.source === 'license' ? 'Ganti lisensi' : 'Aktifkan lisensi'}</button>` : ''}
-              ${(!inTeam() || owner) && lic ? `<button class="btn ghost sm" data-unlicense>Lepas</button>` : ''}
+              ${(!inTeam() || owner) && !demoActive() ? `<button class="btn primary sm" data-activate>${icon('key-round', 15)}${pl.source === 'license' ? 'Ganti lisensi' : 'Aktifkan lisensi'}</button>` : ''}
+              ${(!inTeam() || owner) && lic && !demoActive() ? `<button class="btn ghost sm" data-unlicense>Lepas</button>` : ''}
             </div></div>
+          ${demoRow()}
           <div class="set-row"><div class="meta"><b>Ingin SMALPreneur atau MediumPreneur?</b><span>Hubungi pemilik Serambi untuk kunci lisensi sesuai jumlah anggota timmu.</span></div>
             <button class="btn sm" data-request-license>${icon('mail', 15)}Minta kunci lisensi</button></div>
         </div>
@@ -293,6 +322,9 @@ async function onClick(e) {
   if ('trial' in ds) { try { await api.startTrial(); toast(`Uji coba MediumPreneur ${S.trialDays} hari dimulai`); } catch (e) { toast(e.message, { kind: 'err' }); } return; }
   if ('activate' in ds) return activateDialog();
   if ('unlicense' in ds) { if (await confirmDialog({ title: 'Lepas lisensi?', message: 'Serambi kembali ke paket SOLOPreneur. Data tidak hilang; fitur tim menjadi hanya-lihat.', confirm: 'Lepas lisensi', danger: true })) { await api.removeLicense(); toast('Lisensi dilepas'); } return; }
+  if ('demoEnter' in ds) return demoAction('enter');
+  if ('demoExit' in ds) return demoAction('exit');
+  if ('demoReset' in ds) return demoAction('reset');
   if ('requestLicense' in ds) return api.openMail('Permintaan kunci lisensi Serambi (SMALPreneur/MediumPreneur)');
 }
 
@@ -326,9 +358,10 @@ export function openLicenseIssuer() {
         <div class="field"><label>Nama usaha/pelanggan</label><input class="input" data-f="name" maxlength="80"></div>
         <div class="field"><label>Email pelanggan</label><input class="input" type="email" data-f="email" maxlength="120"></div>
         <div class="field"><label>Masa berlaku</label><select class="input" data-f="months"><option value="1">1 bulan</option><option value="3">3 bulan</option><option value="6">6 bulan</option><option value="12" selected>12 bulan</option><option value="0">Tanpa batas waktu</option></select></div>
+        <label class="check-inline full"><input type="checkbox" data-demo-lic> <span><b>Lisensi demo</b>: juga membuka Mode demo (usaha contoh untuk presentasi). Khusus pemilik atau tim penjual Serambi.</span></label>
       </div>
       <div data-out></div>
-      ${issued.length ? `<details class="consent-hist"><summary>Lisensi yang pernah diterbitkan (${issued.length}) ${icon('chevron-down', 14)}</summary><ul>${issued.slice(0, 50).map((l, i) => `<li>${esc(fmtDate(l.iat))} · ${esc(S.plans[l.plan] ? S.plans[l.plan].name : l.plan)} · ${l.seats} pengguna · ${esc(l.name)}${l.email ? ' · ' + esc(l.email) : ''} · ${l.exp ? 's.d. ' + esc(fmtDate(l.exp)) : 'tanpa batas'} <button class="link" data-copy-old="${i}">salin</button></li>`).join('')}</ul></details>` : ''}`,
+      ${issued.length ? `<details class="consent-hist"><summary>Lisensi yang pernah diterbitkan (${issued.length}) ${icon('chevron-down', 14)}</summary><ul>${issued.slice(0, 50).map((l, i) => `<li>${esc(fmtDate(l.iat))} · ${esc(S.plans[l.plan] ? S.plans[l.plan].name : l.plan)} · ${l.seats} pengguna · ${esc(l.name)}${l.email ? ' · ' + esc(l.email) : ''} · ${l.exp ? 's.d. ' + esc(fmtDate(l.exp)) : 'tanpa batas'}${l.demo ? ' · demo' : ''} <button class="link" data-copy-old="${i}">salin</button></li>`).join('')}</ul></details>` : ''}`,
     foot: `<button class="btn ghost" data-pick>Ganti berkas kunci…</button><span style="flex:1"></span><button class="btn ghost" data-no>Tutup</button><button class="btn primary" data-yes>${icon('badge-check', 15)}Terbitkan</button>`
   });
   const plan = m.el.querySelector('[data-f="plan"]'), seats = m.el.querySelector('[data-f="seats"]');
@@ -336,7 +369,8 @@ export function openLicenseIssuer() {
   const issue = async (pickKey) => {
     const v = Object.fromEntries([...m.el.querySelectorAll('[data-f]')].map(i => [i.dataset.f, i.value]));
     if (!v.name.trim()) { toast('Isi nama pelanggan', { kind: 'err' }); return; }
-    const r = await api.issueLicense({ plan: v.plan, seats: Number(v.seats), name: v.name, email: v.email, months: Number(v.months), pickKey });
+    const demoLic = m.el.querySelector('[data-demo-lic]').checked;
+    const r = await api.issueLicense({ plan: v.plan, seats: Number(v.seats), name: v.name, email: v.email, months: Number(v.months), demo: demoLic, pickKey });
     if (!r.ok) { if (r.error) toast(r.error, { kind: 'err', ms: 7000 }); return; }
     const mail = `mailto:${encodeURIComponent(v.email)}?subject=${encodeURIComponent('Kunci lisensi Serambi ' + S.plans[v.plan].name)}&body=${encodeURIComponent(`Halo ${v.name},
 
