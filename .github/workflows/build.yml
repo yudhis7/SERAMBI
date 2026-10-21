@@ -9,6 +9,12 @@
 # Serambi tetap bisa dilihat dan diunduh di halaman Releases.
 #
 # Cara merilis versi baru: naikkan "version" di package.json, lalu push ke main.
+#
+# Membangun ulang installer Release yang sudah ada (misalnya setelah logo diganti):
+# jalankan workflow ini secara manual (Actions → Rilis Serambi → Run workflow) dan isi
+# "bangun_ulang" dengan daftar versi dan commit sumbernya, contoh:
+#   [{"version":"1.2.1","sha":"<commit 40 karakter>"}]
+# Installer di Release itu diganti (nama berkas sama); tag dan catatan rilis tidak diubah.
 
 name: Rilis Serambi
 
@@ -16,6 +22,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      bangun_ulang:
+        description: 'Bangun ulang Release yang sudah ada, contoh: [{"version":"1.2.1","sha":"<commit>"}]'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -37,7 +48,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           # Riwayat versi: versi, commit, dan apakah ditandai sebagai versi terbaru.
           RIWAYAT: '[{"version":"1.0.0","sha":"d986125b2706196c39b5fe4f5e30599a8eacec47","latest":false}]'
+          BANGUN_ULANG: ${{ github.event.inputs.bangun_ulang }}
         run: |
+          if [ -n "$BANGUN_ULANG" ]; then
+            # Bangun ulang Release yang sudah ada dari commit yang diberikan.
+            todo='[]'
+            for row in $(jq -c '.[]' <<< "$BANGUN_ULANG"); do
+              v=$(jq -r .version <<< "$row"); s=$(jq -r .sha <<< "$row")
+              if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$s" =~ ^[0-9a-f]{40}$ ]]; then
+                echo "::error title=Isian tidak sah::$row"; exit 1
+              fi
+              if ! gh release view "v$v" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+                echo "::error title=Release v$v tidak ada::Bangun ulang hanya untuk Release yang sudah terbit."; exit 1
+              fi
+              echo "v$v dibangun ulang dari $s."
+              todo=$(jq -c --arg v "$v" --arg s "$s" '. + [{version:$v, sha:$s, latest:false}]' <<< "$todo")
+            done
+            echo "todo=$todo" >> "$GITHUB_OUTPUT"
+            [ "$todo" != "[]" ] && echo "any=true" >> "$GITHUB_OUTPUT" || echo "any=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           current=$(node -p "require('./package.json').version")
           list=$(jq -c --arg v "$current" --arg s "$GITHUB_SHA" \
             '[.[] | select(.version != $v)] + [{version:$v, sha:$s, latest:true}]' <<< "$RIWAYAT")
