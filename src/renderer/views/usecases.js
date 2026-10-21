@@ -2,6 +2,7 @@
 //
 // Contoh penggunaan — ready-made playbooks of fictional local businesses that users and
 // prospective users can follow, and apply to their own Serambi in one click.
+import { LOGO_MARK } from '../lib/logo-data.js';
 import { icon } from '../icons.js';
 import { esc, toast, confirmDialog } from '../util.js';
 import { S, api, go, perm, tileForPlatform, planBadge } from '../ctx.js';
@@ -86,12 +87,12 @@ function printable(u) {
   const e = esc;
   return `<!doctype html><html lang="id"><head><title>${e(u.name)}</title><style>
     @page{size:A4;margin:0} body{margin:0;font-family:'Plus Jakarta Sans',sans-serif;color:#1B2033;font-size:10.5pt;line-height:1.5}
-    .p{padding:16mm 16mm 14mm} .brand{color:#1F2A6B;font-weight:800;font-size:10pt;margin-bottom:10pt} .brand span{display:inline-block;width:9pt;height:9pt;border-radius:3pt;background:#F2B33D;margin-right:6pt}
+    .p{padding:16mm 16mm 14mm} .brand{color:#1F2A6B;font-weight:800;font-size:10pt;margin-bottom:10pt} .brand{display:flex;align-items:center} .brand img{width:14pt;height:14pt;margin-right:6pt}
     h1{font-size:22pt;margin:0} .sub{color:#555C74;margin:2pt 0 10pt} .tier{display:inline-block;background:#EEF0FB;color:#3446A8;border-radius:10pt;padding:2pt 8pt;font-weight:700;font-size:9pt}
     h2{font-size:12pt;color:#1F2A6B;margin:14pt 0 5pt} ol,ul{margin:0;padding-left:16pt} li{margin-bottom:4pt} .cols{display:grid;grid-template-columns:1.3fr 1fr;gap:14pt}
     .box{border:1px solid #E1E4EC;border-radius:8pt;padding:8pt 10pt;margin-bottom:8pt} pre{white-space:pre-wrap;font-family:inherit;margin:3pt 0 0;color:#555C74}
     .foot{margin-top:14pt;border-top:1px solid #E1E4EC;padding-top:6pt;color:#8A90A6;font-size:8pt}</style></head><body><div class="p">
-    <div class="brand"><span></span>Serambi · Contoh penggunaan</div>
+    <div class="brand"><img src="${LOGO_MARK}" alt="">Serambi · Contoh penggunaan</div>
     <h1>${e(u.name)}</h1><p class="sub">${e(u.type)} · ${e(u.city)} · ${e(u.people)}</p><span class="tier">${e(TIERS[u.tier].name)}</span>
     <p>${e(u.summary)}</p>
     <div class="cols"><div>

@@ -20,7 +20,9 @@ const VIEWS = {
 };
 let currentView = null;
 
-const BRAND_MARK = `<svg class="brand-mark" viewBox="250 290 524 560" aria-hidden="true"><path d="M282 486 L512 316 L742 486" fill="none" stroke="#fff" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/><path d="M400 548 H624 A72 72 0 0 1 696 620 V686 A72 72 0 0 1 624 758 H468 L392 818 L404 754 A72 72 0 0 1 328 686 V620 A72 72 0 0 1 400 548 Z" fill="#F2B33D"/></svg>`;
+// Serambi logo (generated from branding/serambi-logo.png by scripts/gen-assets.js).
+const BRAND_MARK = `<img class="brand-mark" src="img/logo-mark.png" alt="" draggable="false">`;
+const BRAND_WORD = `<img class="brand-word" src="img/logo-wordmark.png" alt="Serambi" draggable="false">`;
 
 // =====================================================================
 // Sidebar
@@ -68,7 +70,7 @@ function renderSidebar() {
 
   $('#sidebar').innerHTML = `
     <div class="sb-top">
-      <div class="brand">${BRAND_MARK}<span class="brand-text">Serambi</span></div>
+      <div class="brand">${BRAND_MARK}<span class="brand-text">${BRAND_WORD}</span></div>
       <span class="grow"></span>
       ${S.state.security && S.state.security.lock ? `<button class="sb-icon-btn collapse-btn" data-lock title="Kunci Serambi (${modKey()}+Shift+L)">${icon('lock', 17)}</button>` : ''}
       <button class="sb-icon-btn collapse-btn" data-collapse title="Ciutkan panel">${icon('panel-left-close', 18)}</button>
@@ -766,6 +768,7 @@ function openAbout() {
   const m = openModal({
     title: 'Tentang Serambi',
     body: `
+      <img class="about-banner" src="img/logo-lockup.jpg" alt="Serambi · Unify Social, Empower Commerce" draggable="false">
       <div class="about">
         <div class="about-mark">${BRAND_MARK}</div>
         <div>
